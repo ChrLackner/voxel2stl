@@ -24,7 +24,16 @@ find_package(PythonLibs 3 REQUIRED)
 
 # pyspdlog
 find_package(Pyspdlog REQUIRED)
+include_directories(${PYSPDLOG_INCLUDE_DIRS})
+include_directories(${PYBIND11_INCLUDE_DIR})
+
+find_package(NGSolve REQUIRED)
+include_directories(${NGSOLVE_INCLUDE_DIRS})
 
 add_subdirectory(external_dependencies/pybind11)
 add_subdirectory(src)
 add_subdirectory(python)
+
+# Tests
+include(CTest)
+add_subdirectory(tests)
