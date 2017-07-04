@@ -59,7 +59,9 @@ void ExportVoxel2STL(py::module & m)
 }
 
 
-PYBIND11_MODULE(libvoxel2stl,m)
+PYBIND11_PLUGIN(libvoxel2stl)
 {
+  py::module m("libvoxel2stl");
   ExportVoxel2STL(m);
+  return m.ptr();
 }

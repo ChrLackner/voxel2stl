@@ -1,6 +1,7 @@
 
 from ngsolve import *
 from voxel2stl import *
+from pyspdlog import *
 from struct import pack
 from netgen.stl import *
 from numpy import pi
