@@ -27,7 +27,9 @@ find_package(Pyspdlog REQUIRED)
 include_directories(${PYSPDLOG_INCLUDE_DIRS})
 include_directories(${PYBIND11_INCLUDE_DIR})
 
-find_package(NGSolve REQUIRED)
+find_package(NGSolve REQUIRED
+  HINTS $ENV{NETGENDIR}/.. /opt/netgen/ /Applications/Netgen.app/Contents/Resources/CMake C:/netgen
+)
 include_directories(${NGSOLVE_INCLUDE_DIRS})
 
 add_subdirectory(external_dependencies/pybind11)

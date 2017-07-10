@@ -1,0 +1,75 @@
+language: python
+
+python:
+        - "3.4"
+
+notifications:
+        email:
+                on_failure: change
+                on_success: never
+        slack:
+                on_failure: always
+                on_success: always
+
+matrix:
+  include:
+    - os: linux
+      dist: trusty
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-6
+            - libxmu-dev
+            - tk-dev
+            - tcl-dev
+            - libglu1-mesa-dev
+            - liblapacke-dev
+      env:
+        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
+
+before_install:
+        - eval "${MATRIX_EVAL}"
+        - pip3 install pytest
+        - git clone git://git.code.sf.net/p/ngsolve/git ngsolve
+        - cd ngsolve
+        - git submodule update --init --recursive
+        - mkdir build
+        - cd build
+        - cmake .. -DUSE_CCACHE=ON
+                   -DCMAKE_CXX_COMPILER=g++-6
+                   -DCMAKE_C_COMPILER=gcc-6
+        - make -j 2
+        - sudo make install
+        - export NETGENDIR=/opt/netgen/bin
+        - export PYTHONPATH=$PYTHONPATH:.:/opt/netgen/lib/python3.4/site-packages
+        - cd ../..
+        - git clone https://github.com/ChrLackner/pyspdlog.git
+        - cd pyspdlog
+        - git submodule update --init --recursive
+        - mkdir build
+        - cd build
+        - cmake .. -DUSE_CCACHE=ON
+                   -DCMAKE_CXX_COMPILER=g++-6
+                   -DCMAKE_C_COMPILER=gcc-6
+                   -DCMAKE_INSTALL_PREFIX=~/install/python
+        - make -j 2
+        - make install
+        - cd ../..
+
+
+install:
+        - mkdir build
+        - cd build
+        - cmake .. -DCMAKE_INSTALL_PREFIX=~/install/python
+                   -DCMAKE_CXX_COMPILER=g++-6
+                   -DCMAKE_C_COMPILER=gcc-6
+                   -DPyspdlog_DIR=~/install/python/pyspdlog
+        - make -j 6
+        - make install
+        - export PYTHONPATH=$PYTHONPATH:~/install/python
+
+script:
+        - export OMP_NUM_THREADS=6
+        - make test ARGS=-V
