@@ -26,10 +26,10 @@ void ExportVoxel2STL(py::module & m)
          "Write the material number of each voxel restricted to the with it's coordinates to an output file")
     ;
 
-  py::class_<VoxelSTLGeometry>
+  py::class_<VoxelSTLGeometry, shared_ptr<VoxelSTLGeometry>, pyspdlog::LoggedClass>
     (m,"VoxelSTLGeometry", "STLGeometry from voxel data")
-    .def("__init__", [](VoxelSTLGeometry* instance,
-                        shared_ptr<VoxelData> data, py::object mats, py::object bnds)
+    .def("__init__", [](VoxelSTLGeometry* instance, shared_ptr<VoxelData> data,
+                        py::object mats, py::object bnds, shared_ptr<spdlog::logger> log)
          {
            shared_ptr<Array<int>> materials = nullptr;
            shared_ptr<Array<int>> boundaries = nullptr;
@@ -49,8 +49,9 @@ void ExportVoxel2STL(py::module & m)
                for (auto bnd : bndlist)
                  boundaries->Append(py::cast<int>(bnd));
              }
-           new (instance) VoxelSTLGeometry(data,materials,boundaries);
-         }, py::arg("voxeldata"), py::arg("materials")=nullptr, py::arg("boundaries")=nullptr)
+           new (instance) VoxelSTLGeometry(data,materials,boundaries,log);
+         }, py::arg("voxeldata"), py::arg("materials")=nullptr, py::arg("boundaries")=nullptr,
+         py::arg("logger") = make_shared<spdlog::logger>("VoxelSTLGeometry", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
     .def("ApplySmoothingStep", &VoxelSTLGeometry::ApplySmoothingStep,
          py::arg("subdivision"),py::arg("weight_area")=0.1,py::arg("weight_minimum")=1.0)
     .def("WriteSTL", &VoxelSTLGeometry::WriteSTL)
@@ -62,6 +63,7 @@ void ExportVoxel2STL(py::module & m)
 PYBIND11_PLUGIN(libvoxel2stl)
 {
   py::module m("libvoxel2stl");
+  py::module::import("pyspdlog");
   ExportVoxel2STL(m);
   return m.ptr();
 }

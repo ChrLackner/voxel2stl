@@ -6,10 +6,14 @@
 
 namespace voxel2stl
 {
-  VoxelSTLGeometry::VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<int>> amaterials, shared_ptr<Array<int>> aboundaries) : data(adata), materials(amaterials), boundaries(aboundaries)
+  VoxelSTLGeometry::VoxelSTLGeometry(shared_ptr<VoxelData> adata,
+                                     shared_ptr<Array<int>> amaterials,
+                                     shared_ptr<Array<int>> aboundaries,
+                                     shared_ptr<spdlog::logger> log)
+    : pyspdlog::LoggedClass(log),
+      data(adata), materials(amaterials), boundaries(aboundaries)
   {
     m = data->Getm();
-    log = pyspdlog::loggers.getLogger("Geometry");
 #pragma omp parallel
     {
       num_threads = omp_get_num_threads();
@@ -140,7 +144,7 @@ namespace voxel2stl
 
   void VoxelSTLGeometry :: GenerateTrianglesAndVertices()
   {
-    log->trace("Create triangles and vertices with " + std::to_string(num_threads)  + " threads...");
+    log->debug("Create triangles and vertices with " + std::to_string(num_threads)  + " threads...");
     Array<unique_ptr<Triangle>> triangles_thread[num_threads];
     Array<unique_ptr<Vertex>> vertices_thread[num_threads];
     Array<Vertex*> openVertices[num_threads];
@@ -162,13 +166,13 @@ namespace voxel2stl
       }
 
     for (auto thread_num : Range(num_threads))
-      log->trace("First openVertices for thread " + std::to_string(thread_num) + ": " + std::to_string(openVertices[thread_num].Size()));
+      log->debug("First openVertices for thread " + std::to_string(thread_num) + ": " + std::to_string(openVertices[thread_num].Size()));
     for (int thread_num = 1; thread_num < num_threads; thread_num++)
       for (auto i : Range(openVertices[thread_num].Size()))
         openVertices[thread_num-1].Append(openVertices[thread_num][i]);
 
     for (auto thread_num : Range(num_threads))
-      log->trace("OpenVertices for thread " + std::to_string(thread_num) + ", after appending open vertices of next thread: " + std::to_string(openVertices[thread_num].Size()));
+      log->debug("OpenVertices for thread " + std::to_string(thread_num) + ", after appending open vertices of next thread: " + std::to_string(openVertices[thread_num].Size()));
     // build triangles on thread interface
 #pragma omp parallel for
     for (int thread_num = 0; thread_num < num_threads; thread_num++)

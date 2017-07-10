@@ -3,7 +3,7 @@
 
 namespace voxel2stl
 {
-  class VoxelSTLGeometry
+  class VoxelSTLGeometry : public pyspdlog::LoggedClass
   {
   private:
     struct Vertex;
@@ -14,11 +14,10 @@ namespace voxel2stl
     double m;
     int num_threads;
     Array<unique_ptr<Array<Vertex*>>> vertex_clustering;
-    shared_ptr<spdlog::logger> log;
     shared_ptr<Array<int>> materials, boundaries;
 
   public:
-    VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<int>> amaterials, shared_ptr<Array<int>> aboundaries);
+    VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<int>> amaterials, shared_ptr<Array<int>> aboundaries, shared_ptr<spdlog::logger> log);
 
     void ApplySmoothingStep(bool subdivision, double weight_area, double weight_minimum);
     void KeepInside (shared_ptr<VoxelSTLGeometry> other);

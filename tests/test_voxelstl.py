@@ -23,13 +23,12 @@ def test_voxelSTL():
     logger.SetLevel(LOGGING_LEVEL.DEBUG)
     sinkconsole.SetLevel(LOGGING_LEVEL.INFO)
     sinkfile.SetLevel(LOGGING_LEVEL.DEBUG)
-    SetLogger("Geometry",logger)
     CreateVoxel("voxelmodel.raw",
                 lambda x,y,z: int((100-((x-50)*(x-50)+(y-50)*(y-50)+(z-50)*(z-50)))>0) +
                 int((100-((x-50)*(x-50)+(y-50)*(y-50)+(z-50)*(z-50)))>0) * int(z>=50),
                 (100,100,100))
     data = VoxelData("voxelmodel.raw",100,100,100,0.01)
-    geo = VoxelSTLGeometry(data,materials=[2],boundaries=[-10,200,50,200,-10,200])
+    geo = VoxelSTLGeometry(data,materials=[2],boundaries=[-10,200,50,200,-10,200],logger=logger)
     logger.info("STL done, start smoothing")
     geo.ApplySmoothingStep(False)
     geo.ApplySmoothingStep(False)
