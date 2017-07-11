@@ -10,7 +10,12 @@ void ExportVoxel2STL(py::module & m)
 {
   py::class_<VoxelData,shared_ptr<VoxelData>>
     (m,"VoxelData", "Container for loading of voxel data")
-    .def(py::init<string&, int, int, int, double>())
+    .def("__init__", [](VoxelData* instance, string filename, int nx, int ny, int nz,
+                        double m, shared_ptr<spdlog::logger> log)
+         {
+           new (instance) VoxelData(filename, nx, ny, nz, m, log);
+         }, py::arg("filename"), py::arg("nx"), py::arg("ny"), py::arg("nz"), py::arg("m"),
+         py::arg("log") = make_shared<spdlog::logger>("VoxelData",make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
     .def("WriteMaterials", (void (VoxelData::*)(const string&) const) &VoxelData::WriteMaterials,
          "Write the material number of each voxel with it's coordinates to an output file")
     .def("WriteMaterials",[](shared_ptr<VoxelData> self, string & filename, py::list aregion)

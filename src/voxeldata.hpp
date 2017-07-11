@@ -3,7 +3,7 @@
 
 namespace voxel2stl
 {  
-  class VoxelData
+  class VoxelData : public pyspdlog::LoggedClass
   {
   private:
     Array<double> data;
@@ -11,7 +11,8 @@ namespace voxel2stl
     double m;
   
   public:
-    VoxelData(std::string & filename, int anx, int any, int anz, double am);
+    VoxelData(std::string & filename, int anx, int any, int anz, double am,
+              shared_ptr<spdlog::logger> alog);
 
     void WriteMaterials(const string & filename) const;
     void WriteMaterials(const string & filename, const Array<int>& region) const;
