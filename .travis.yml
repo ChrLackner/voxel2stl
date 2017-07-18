@@ -32,19 +32,6 @@ matrix:
 before_install:
         - eval "${MATRIX_EVAL}"
         - pip3 install pytest numpy-stl matplotlib
-        - git clone git://git.code.sf.net/p/ngsolve/git ngsolve
-        - cd ngsolve
-        - git submodule update --init --recursive
-        - mkdir build
-        - cd build
-        - cmake .. -DUSE_CCACHE=ON
-                   -DCMAKE_CXX_COMPILER=g++-6
-                   -DCMAKE_C_COMPILER=gcc-6
-        - make -j 2
-        - sudo make install
-        - export NETGENDIR=/opt/netgen/bin
-        - export PYTHONPATH=$PYTHONPATH:.:/opt/netgen/lib/python3.4/site-packages
-        - cd ../..
         - git clone https://github.com/ChrLackner/pyspdlog.git
         - cd pyspdlog
         - git submodule update --init --recursive
