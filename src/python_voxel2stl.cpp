@@ -1,10 +1,10 @@
 
 #include "voxel2stl.hpp"
-#include <python_ngstd.hpp>
 #include <stdio.h>
+#include <pybind11/pybind11.h>
 
 using namespace voxel2stl;
-using namespace ngfem;
+namespace py = pybind11;
 
 void ExportVoxel2STL(py::module & m)
 {
