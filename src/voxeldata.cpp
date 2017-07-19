@@ -20,12 +20,14 @@ namespace voxel2stl
     {
       num_threads = omp_get_num_threads();
     }
-    char buffer[nx*ny*nz];
+    char* buffer = (char*) malloc(nx*ny*nz);
     is.read(buffer,nx*ny*nz);
+    log->debug(std::string(buffer));
+    log->flush();
     if(is)
       log->info("Voxel data read successfully.");
     else
-      log->error("Error in reading of voxel data");
+      log->error("Error in reading of voxel data from file " + filename);
     log->flush();
     is.close();
     int nx_old = nx;
@@ -40,6 +42,7 @@ namespace voxel2stl
 #pragma omp parallel for
     for(size_t i = nx_old*ny*nz; i<nx*ny*nz; i++)
       data[i] = 0;
+    free(buffer);
   }
 
   void VoxelData::WriteMaterials(const string & filename) const
