@@ -60,7 +60,7 @@ void ExportVoxel2STL(py::module & m)
     .def("ApplySmoothingStep", &VoxelSTLGeometry::ApplySmoothingStep,
          py::arg("subdivision"),py::arg("weight_area")=0.1,py::arg("weight_minimum")=1.0)
     .def("WriteSTL", &VoxelSTLGeometry::WriteSTL)
-    .def("WriteMeshsizeFile", &VoxelSTLGeometry::WriteMeshsizeFile)
+    // .def("WriteMeshsizeFile", &VoxelSTLGeometry::WriteMeshsizeFile)
     ;
 }
 

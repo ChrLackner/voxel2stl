@@ -20,10 +20,10 @@ namespace voxel2stl
     VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<int>> amaterials, shared_ptr<Array<int>> aboundaries, shared_ptr<spdlog::logger> log);
 
     void ApplySmoothingStep(bool subdivision, double weight_area, double weight_minimum);
-    void KeepInside (shared_ptr<VoxelSTLGeometry> other);
+    // void KeepInside (shared_ptr<VoxelSTLGeometry> other);
     void WriteSTL(string filename);
-    void WriteMeshsizeFile(shared_ptr<VoxelSTLGeometry> otherGeo, const string& name);
-    Array<unique_ptr<Vertex>>& GetVertices() { return vertices; }
+    // void WriteMeshsizeFile(shared_ptr<VoxelSTLGeometry> otherGeo, const string& name);
+    // Array<unique_ptr<Vertex>>& GetVertices() { return vertices; }
 
   private:
     inline bool isUsedVoxel(int x, int y, int z)
@@ -44,10 +44,15 @@ namespace voxel2stl
     void PartitionVertices();
     void SubdivisionTriangles();
     void MinimizeEnergy(double weight_area, double weight_minimum);
-    void GenerateTVCube(bool deletevertices, int x, int y, int z, Array<Vertex*>& openVertices, Array<unique_ptr<Triangle>>& triangles, Array<unique_ptr<Vertex>>& vertices);
-    Vertex* MakeVertex(bool deletevertices, Array<unique_ptr<Vertex>> & vertices, Array<Vertex*> & openVertices, int x1, int y1, int z1, int x2, int y2, int z2);
+    void GenerateTVCube(int x, int y, int z,
+                        Array<unique_ptr<Vertex>>& thread_vertices,
+                        Array<unique_ptr<Vertex>>* global_vertices);
+    Vertex* MakeVertex(Array<unique_ptr<Vertex>>* global_vertices,
+                       Array<Vertex*>& local_vertices,
+                       Array<unique_ptr<Vertex>>& thread_vertices,
+                       int x1, int y1, int z1, int x2, int y2, int z2);
     void QuickSortVertices(size_t low, size_t up);
-    double FindClosest(Vertex* vertex, Vertex** closest);
+    // double FindClosest(Vertex* vertex, Vertex** closest);
 
     struct Vertex{
       //int x1,y1,z1;
@@ -61,7 +66,7 @@ namespace voxel2stl
 
       Vertex(Vec<3,double> ax, Vec<3,double> ay) : x(ax), y(ay){
         SetRatio(0.5); }
-      Vertex(Vertex* v1, Vertex* v2, Vec<3,double>& normal)
+      Vertex(Vertex* v1, Vertex* v2)
       {
         x = 0.5*(v1->x+v2->x);
         y = 0.5*(v1->y+v2->y);
@@ -96,6 +101,12 @@ namespace voxel2stl
               }
           }
         throw Exception("Wanted to delete non existing neighbor!");
+      }
+
+      inline string to_string() {
+        return "(" + std::to_string(x[0]) + "," + std::to_string(x[1]) + "," +
+          std::to_string(x[2]) + ") -> (" + std::to_string(y[0]) + "," +
+          std::to_string(y[1]) + "," + std::to_string(y[2]) + ")";
       }
     };
 
