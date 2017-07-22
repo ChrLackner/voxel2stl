@@ -10,7 +10,7 @@ void ExportVoxel2STL(py::module & m)
 {
   py::class_<VoxelData,shared_ptr<VoxelData>>
     (m,"VoxelData", "Container for loading of voxel data")
-    .def("__init__", [](VoxelData* instance, string filename, int nx, int ny, int nz,
+    .def("__init__", [](VoxelData* instance, string& filename, size_t nx, size_t ny, size_t nz,
                         double m, shared_ptr<spdlog::logger> log)
          {
            new (instance) VoxelData(filename, nx, ny, nz, m, log);
@@ -22,9 +22,9 @@ void ExportVoxel2STL(py::module & m)
          {
            if(py::len(aregion)!=6)
              throw Exception("Must provide 6 integers for region!");
-           Array<int> region(6);
+           Array<size_t> region(6);
            for(auto i : Range(6)) {
-             region[i] = py::cast<int>(aregion[i]);
+             region[i] = py::cast<size_t>(aregion[i]);
            }
            self->WriteMaterials(filename,region);
          },
@@ -36,23 +36,23 @@ void ExportVoxel2STL(py::module & m)
     .def("__init__", [](VoxelSTLGeometry* instance, shared_ptr<VoxelData> data,
                         py::object mats, py::object bnds, shared_ptr<spdlog::logger> log)
          {
-           shared_ptr<Array<int>> materials = nullptr;
-           shared_ptr<Array<int>> boundaries = nullptr;
+           shared_ptr<Array<size_t>> materials = nullptr;
+           shared_ptr<Array<size_t>> boundaries = nullptr;
            if (!mats.is_none())
              {
                auto matlist = py::cast<py::list>(mats);
-               materials = make_shared<Array<int>>(py::len(matlist));
+               materials = make_shared<Array<size_t>>(py::len(matlist));
                materials->SetSize(0);
                for (auto mat : matlist)
-                 materials->Append(py::cast<int>(mat));
+                 materials->Append(py::cast<size_t>(mat));
              }
            if (!bnds.is_none())
              {
                auto bndlist = py::cast<py::list>(bnds);
-               boundaries = make_shared<Array<int>>(py::len(bndlist));
+               boundaries = make_shared<Array<size_t>>(py::len(bndlist));
                boundaries->SetSize(0);
                for (auto bnd : bndlist)
-                 boundaries->Append(py::cast<int>(bnd));
+                 boundaries->Append(py::cast<size_t>(bnd));
              }
            new (instance) VoxelSTLGeometry(data,materials,boundaries,log);
          }, py::arg("voxeldata"), py::arg("materials")=nullptr, py::arg("boundaries")=nullptr,

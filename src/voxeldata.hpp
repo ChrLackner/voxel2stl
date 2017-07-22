@@ -7,21 +7,21 @@ namespace voxel2stl
   {
   private:
     Array<double> data;
-    int nx,ny,nz;
+    size_t nx,ny,nz;
     double m;
   
   public:
-    VoxelData(std::string & filename, int anx, int any, int anz, double am,
+    VoxelData(std::string filename, size_t anx, size_t any, size_t anz, double am,
               shared_ptr<spdlog::logger> alog);
 
     void WriteMaterials(const string & filename) const;
-    void WriteMaterials(const string & filename, const Array<int>& region) const;
+    void WriteMaterials(const string & filename, const Array<size_t>& region) const;
 
-    double operator()(int i, int j, int k) const { return data[i+nx*(j+ny*k)]; }
+    double operator()(size_t i, size_t j, size_t k) const { return data[i+nx*(j+ny*k)]; }
     double Getm()  const  { return m; }
-    int Getnx() const { return nx; }
-    int Getny() const { return ny; }
-    int Getnz() const { return nz; }    
+    size_t Getnx() const { return nx; }
+    size_t Getny() const { return ny; }
+    size_t Getnz() const { return nz; }
   };
 }
 

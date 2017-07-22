@@ -8,8 +8,8 @@
 namespace voxel2stl
 {
   VoxelSTLGeometry::VoxelSTLGeometry(shared_ptr<VoxelData> adata,
-                                     shared_ptr<Array<int>> amaterials,
-                                     shared_ptr<Array<int>> aboundaries,
+                                     shared_ptr<Array<size_t>> amaterials,
+                                     shared_ptr<Array<size_t>> aboundaries,
                                      shared_ptr<spdlog::logger> log)
     : pyspdlog::LoggedClass(log),
       data(adata), materials(amaterials), boundaries(aboundaries)
@@ -233,8 +233,8 @@ namespace voxel2stl
     log->info("Start subdividing triangles");
     double smaller_than = 0.8;
     //first step: determine triangles to be divided and their neighbours
-    int sum = 0;
-    for (int i = 0; i < triangles.Size(); i++){
+    size_t sum = 0;
+    for (size_t i = 0; i < triangles.Size(); i++){
       bool divide = false;
       //if cos(angle) between normals < 0.8 divide true
       if ( InnerProduct(triangles[i]->n, triangles[i]->NeighbourTriangle(triangles[i]->v1)->n)<smaller_than) divide = true;
@@ -258,8 +258,8 @@ namespace voxel2stl
     //second step: create vertices and make new triangles
     Array<Vertex*> openVertices;
     Array<unique_ptr<Vertex>> newVertices;
-    int trianglesOriginalSize = triangles.Size();
-    for (int i = 0; i < trianglesOriginalSize; i++){
+    size_t trianglesOriginalSize = triangles.Size();
+    for (size_t i = 0; i < trianglesOriginalSize; i++){
 
       if (triangles[i]->subdivisionParameter == 2){
         // store v1, v2, v3 in array for better coding
@@ -322,15 +322,15 @@ namespace voxel2stl
 
       }
     }
-    for (int i=trianglesOriginalSize-1; i>=0; i--){
+    for (size_t i=trianglesOriginalSize-1; i>=0; i--){
       if (triangles[i]->subdivisionParameter > 0) {
         triangles.DeleteElement(i);
       }
     }
-    int new_cluster = vertex_clustering.Size();
+    size_t new_cluster = vertex_clustering.Size();
     vertex_clustering.Append(make_unique<Array<Vertex*>>(newVertices.Size()));
     vertex_clustering[new_cluster]->SetSize(0);
-    for (int i = 0; i<newVertices.Size(); i++){
+    for (size_t i = 0; i<newVertices.Size(); i++){
       vertex_clustering[new_cluster]->Append(&*newVertices[i]);
       vertices.Append(move(newVertices[i]));
     }
@@ -340,7 +340,7 @@ namespace voxel2stl
   {
     double e = 0; double e_diff = 0;
     log->info("Minimize energy with " + std::to_string(num_threads) + " threads");
-    for (int cluster = 0; cluster<vertex_clustering.Size(); cluster++)
+    for (size_t cluster = 0; cluster<vertex_clustering.Size(); cluster++)
       {
 #pragma omp parallel for
         for (size_t i = 0; i < vertex_clustering[cluster]->Size();i++)
@@ -419,13 +419,13 @@ namespace voxel2stl
       }
   }
 
-  void VoxelSTLGeometry :: GenerateTVCube(int x, int y, int z,
+  void VoxelSTLGeometry :: GenerateTVCube(size_t x, size_t y, size_t z,
                                           Array<unique_ptr<Vertex>>& thread_vertices)
   {
     SPDLOG_DEBUG(log, "Start cube (" + to_string(x) + "," + to_string(y) + "," + to_string(z) + ")");
     int one = 1;
     //flip cube diagonal every second step to match faces of tetraeders inside
-    int x_old = x; int y_old = y; int z_old = z;
+    size_t x_old = x; size_t y_old = y; size_t z_old = z;
     if((x+y+z)%2 == 0)
       {
         x++; y++; z++; one=-1;
@@ -442,8 +442,8 @@ namespace voxel2stl
       return;
     Array<Vertex*> local_vertices;
 
-    int px,py,pz;
-    int count = 0;
+    size_t px,py,pz;
+    size_t count = 0;
     // first tetraeder
     Array<Vertex*> tet1;
     if(p000-p100) {
@@ -818,13 +818,13 @@ namespace voxel2stl
   VoxelSTLGeometry::Vertex* VoxelSTLGeometry ::
   MakeVertex(Array<Vertex*>& local_vertices,
              Array<unique_ptr<Vertex>>& thread_vertices,
-             int x1, int y1, int z1, int x2, int y2, int z2)
+             size_t x1, size_t y1, size_t z1, size_t x2, size_t y2, size_t z2)
   {
     if (isUsedVoxel(x1,y1,z1)) {
       //nothing to be done, x is inner point
     }
     else{
-      int tmp = x1; x1 = x2; x2 = tmp;
+      size_t tmp = x1; x1 = x2; x2 = tmp;
       tmp = y1; y1 = y2; y2 = tmp;
       tmp = z1; z1 = z2; z2 = tmp;
     }
@@ -857,7 +857,7 @@ namespace voxel2stl
                         Array<unique_ptr<Vertex>>& newVertices,
                         std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*>& vox_to_vert){
     bool deleteVertex = false;
-    for(int i = openVertices.Size()-1; i>=0; i--){
+    for(size_t i = openVertices.Size()-1; i>=0; i--){
       deleteVertex = false;
       bool go = true;
       for (int j= 0; j<3 && go; j++){
@@ -928,9 +928,9 @@ namespace voxel2stl
 	double r=r0;
 	energy = func(r0);
 	//newton method
-	int count = 0;
+	size_t count = 0;
 	double alpha = 1.0;
-	int countalpha = 1;
+	size_t countalpha = 1;
 	double eps = 1e-2; //try 1e-2 or 1e-3
 	double h = 1e-4; //h must be smaller than eps
 	double w=1;

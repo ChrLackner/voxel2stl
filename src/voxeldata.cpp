@@ -4,10 +4,11 @@
 
 namespace voxel2stl
 {
-  VoxelData::VoxelData(std::string & filename, int anx, int any, int anz, double am,
+  VoxelData::VoxelData(std::string filename, size_t anx, size_t any, size_t anz, double am,
                        shared_ptr<spdlog::logger> alog)
     : nx(anx), ny(any), nz(anz), m(am), LoggedClass(alog)
   {
+    log->debug("Voxeldata size is " + to_string(nx*ny*nz));
     ifstream is(filename, ios::in | ios::binary);
     if (!is)
       {
@@ -22,7 +23,7 @@ namespace voxel2stl
     }
     char* buffer = (char*) malloc(nx*ny*nz);
     is.read(buffer,nx*ny*nz);
-    log->debug(std::string(buffer));
+    // log->debug(std::string(buffer));
     log->flush();
     if(is)
       log->info("Voxel data read successfully.");
@@ -30,7 +31,7 @@ namespace voxel2stl
       log->error("Error in reading of voxel data from file " + filename);
     log->flush();
     is.close();
-    int nx_old = nx;
+    auto nx_old = nx;
     while (! (nx%num_threads))
       nx++;
     data.SetSize(nx*ny*nz);
@@ -59,7 +60,7 @@ namespace voxel2stl
     of.close();
   }
   
-  void VoxelData::WriteMaterials(const string & filename, const Array<int>& region) const
+  void VoxelData::WriteMaterials(const string & filename, const Array<size_t>& region) const
   {
     log->debug("Start writing materials of regions:");
     log->flush();
@@ -67,9 +68,9 @@ namespace voxel2stl
       log->debug(i);
     ofstream of;
     of.open(filename);
-    for (auto i : Range(std::max(0,region[0]),std::min(nx,region[1])))
-      for (auto j : Range(std::max(0,region[2]),std::min(ny,region[3])))
-        for (auto k : Range(std::max(0,region[4]),std::min(nz,region[5])))
+    for (auto i : Range(std::max(size_t(0),region[0]),std::min(nx,region[1])))
+      for (auto j : Range(std::max(size_t(0),region[2]),std::min(ny,region[3])))
+        for (auto k : Range(std::max(size_t(0),region[4]),std::min(nz,region[5])))
           of << i*m << "," << j*m << "," << k*m << "," << (*this)(i,j,k) << endl;
     log->info("Coefficients written to file " + filename);
     of.close();

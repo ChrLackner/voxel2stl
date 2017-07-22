@@ -14,17 +14,17 @@ namespace voxel2stl
     double m;
     int num_threads;
     Array<unique_ptr<Array<Vertex*>>> vertex_clustering;
-    shared_ptr<Array<int>> materials, boundaries;
+    shared_ptr<Array<size_t>> materials, boundaries;
     std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*> voxel_to_vertex;
 
   public:
-    VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<int>> amaterials, shared_ptr<Array<int>> aboundaries, shared_ptr<spdlog::logger> log);
+    VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<size_t>> amaterials, shared_ptr<Array<size_t>> aboundaries, shared_ptr<spdlog::logger> log);
 
     void ApplySmoothingStep(bool subdivision, double weight_area, double weight_minimum);
     void WriteSTL(string filename);
 
   private:
-    inline bool isUsedVoxel(int x, int y, int z)
+    inline bool isUsedVoxel(size_t x, size_t y, size_t z)
     {
       if (boundaries)
         {
@@ -42,11 +42,11 @@ namespace voxel2stl
     void PartitionVertices();
     void SubdivisionTriangles();
     void MinimizeEnergy(double weight_area, double weight_minimum);
-    void GenerateTVCube(int x, int y, int z,
+    void GenerateTVCube(size_t x, size_t y, size_t z,
                         Array<unique_ptr<Vertex>>& thread_vertices);
     Vertex* MakeVertex(Array<Vertex*>& local_vertices,
                        Array<unique_ptr<Vertex>>& thread_vertices,
-                       int x1, int y1, int z1, int x2, int y2, int z2);
+                       size_t x1, size_t y1, size_t z1, size_t x2, size_t y2, size_t z2);
 
     struct Vertex{
       //int x1,y1,z1;
@@ -77,7 +77,6 @@ namespace voxel2stl
         for (int i = 0; i<nn; i++)
           neighbours[i]->UpdateNormal();
       }
-      inline int getx1() { return x[0]; }
       inline void addNeighbour(Triangle* tri)
       {
         neighbours.Append(tri);
