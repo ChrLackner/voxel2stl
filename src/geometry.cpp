@@ -881,7 +881,6 @@ namespace voxel2stl
   // create new vertex and store unique_ptr to it in vertices, put pointer in openVertices and return
   // pointer to that new vertex
   
-  // TODO: in first round we could search for existing vertices only in current voxel
   VoxelSTLGeometry::Vertex* VoxelSTLGeometry ::
   MakeVertex(Array<unique_ptr<Vertex>>* global_vertices,
              Array<Vertex*>& local_vertices,
@@ -905,8 +904,7 @@ namespace voxel2stl
           SPDLOG_DEBUG(log, "Vertex " + vert->to_string() + " found in local vertices");
           return vert;
         }
-    auto itV = voxel_to_vertex.find(make_tuple(std::min(x1,x2),std::min(y1,y2),std::min(z1,z2),
-                                               std::max(x1,x2),std::max(y1,y2),std::max(y1,y2)));
+    auto itV = voxel_to_vertex.find(make_tuple(x1,y1,z1,x2,y2,z2));
     if(itV != voxel_to_vertex.end())
       {
         SPDLOG_DEBUG(log, "Vertex " + itV->second->to_string() + " found in global vertices");
@@ -915,8 +913,7 @@ namespace voxel2stl
 
     auto newVertex = make_unique<Vertex>(x,y);
     auto nvert = &*newVertex;
-    voxel_to_vertex[make_tuple(std::min(x1,x2),std::min(y1,y2),std::min(z1,z2),
-                               std::max(x1,x2),std::max(y1,y2),std::max(y1,y2))] = nvert;
+    voxel_to_vertex[make_tuple(x1,y1,z1,x2,y2,z2)] = nvert;
     SPDLOG_DEBUG(log, "Created new vertex " + nvert->to_string());
     thread_vertices.Append(move(newVertex));
     return nvert;
