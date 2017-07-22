@@ -15,15 +15,13 @@ namespace voxel2stl
     int num_threads;
     Array<unique_ptr<Array<Vertex*>>> vertex_clustering;
     shared_ptr<Array<int>> materials, boundaries;
+    std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*> voxel_to_vertex;
 
   public:
     VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<int>> amaterials, shared_ptr<Array<int>> aboundaries, shared_ptr<spdlog::logger> log);
 
     void ApplySmoothingStep(bool subdivision, double weight_area, double weight_minimum);
-    // void KeepInside (shared_ptr<VoxelSTLGeometry> other);
     void WriteSTL(string filename);
-    // void WriteMeshsizeFile(shared_ptr<VoxelSTLGeometry> otherGeo, const string& name);
-    // Array<unique_ptr<Vertex>>& GetVertices() { return vertices; }
 
   private:
     inline bool isUsedVoxel(int x, int y, int z)
@@ -45,14 +43,10 @@ namespace voxel2stl
     void SubdivisionTriangles();
     void MinimizeEnergy(double weight_area, double weight_minimum);
     void GenerateTVCube(int x, int y, int z,
-                        Array<unique_ptr<Vertex>>& thread_vertices,
-                        Array<unique_ptr<Vertex>>* global_vertices);
-    Vertex* MakeVertex(Array<unique_ptr<Vertex>>* global_vertices,
-                       Array<Vertex*>& local_vertices,
+                        Array<unique_ptr<Vertex>>& thread_vertices);
+    Vertex* MakeVertex(Array<Vertex*>& local_vertices,
                        Array<unique_ptr<Vertex>>& thread_vertices,
                        int x1, int y1, int z1, int x2, int y2, int z2);
-    void QuickSortVertices(size_t low, size_t up);
-    // double FindClosest(Vertex* vertex, Vertex** closest);
 
     struct Vertex{
       //int x1,y1,z1;
@@ -202,7 +196,9 @@ namespace voxel2stl
 	}
       }
 
-      void MakeSubdivisionVertex(Array<Vertex*>& openVertices, Array<Vertex*>& vertex, Array<unique_ptr<Vertex>>& newVertices);
+      void MakeSubdivisionVertex(Array<Vertex*>& openVertices, Array<Vertex*>& vertex,
+                                 Array<unique_ptr<Vertex>>& newVertices,
+                                 std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*>& vox_to_vert);
     };
 
   };

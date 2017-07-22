@@ -30,23 +30,9 @@ namespace voxel2stl
     if (subdivision)
       {
         SubdivisionTriangles();
-        PartitionVertices();
       }
     MinimizeEnergy(weight_area,weight_minimum);
   }
-
-//   void VoxelSTLGeometry :: KeepInside (shared_ptr<VoxelSTLGeometry> other)
-//   {
-//     auto nvert = other->GetVertices().Size();
-// #pragma omp parallel for
-//     for (size_t i = 0; i < nvert; i++)
-//       {
-//         Vertex *vother = &*(other->GetVertices()[i]);
-//         Vertex *closest = nullptr;
-//         FindClosest(vother, &closest);
-        
-//       }
-//   }
 
   void VoxelSTLGeometry :: WriteSTL(string filename)
   {
@@ -93,57 +79,6 @@ namespace voxel2stl
     stlout << "endsolid" << endl;
   }
 
-//   void VoxelSTLGeometry :: WriteMeshsizeFile(shared_ptr<VoxelSTLGeometry> otherGeo, const string & name)
-//   {
-//     std::remove((name + ".msz").c_str());
-//     auto output = make_shared<spdlog::logger>("meshsize_output_" + name,
-//                                               make_shared<spdlog::sinks::simple_file_sink_mt>(name + ".msz"));
-//     output->set_level(spdlog::level::info);
-//     output->set_pattern("%v");
-//     output->info(std::to_string(otherGeo->GetVertices().Size()) + "\n");
-// #pragma omp parallel for
-//     for (size_t i = 0; i < otherGeo->GetVertices().Size(); i++)
-//       {
-//         Vertex* closest = nullptr;
-//         Vertex* other = &*(otherGeo->GetVertices()[i]);
-//         double dist = FindClosest(other, &closest);
-//         log->trace("Vertex: (" +
-//                    std::to_string(other->xy[0]*m) + "," +
-//                    std::to_string(other->xy[1]*m) + "," +
-//                    std::to_string(other->xy[2]*m) + "," +
-//                    ")\n" +
-//                    "Dist to closest: " + std::to_string(dist*m) + "\n " +
-//                    "Closest vertex: (" +
-//                    std::to_string(closest->xy[0]*m) + "," +
-//                    std::to_string(closest->xy[1]*m) + "," +
-//                    std::to_string(closest->xy[2]*m) + "," +
-//                    ")\n");
-//         output->info(std::to_string(other->xy[0]*m) + " " +
-//                      std::to_string(other->xy[1]*m) + " " +
-//                      std::to_string(other->xy[2]*m) + " " +
-//                      std::to_string(dist*m) + "\n");
-//       }
-//     output->info("0\n");
-//     output->flush();
-//   }
-
-  // double VoxelSTLGeometry :: FindClosest(Vertex* vertex, Vertex** closest)
-  // {
-  //   double mindist = std::numeric_limits<double>::max();
-  //   for (auto i : Range(vertices.Size()))
-  //     {
-  //       Vertex* v = &*vertices[i];
-  //       Vec<3> diff = v->xy - vertex->xy;
-  //       double len = sqrt(diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]);
-  //       if (len<mindist)
-  //         {
-  //           mindist = len;
-  //           *closest = v;
-  //         }
-  //     }
-  //   return mindist;
-  // }
-
   void VoxelSTLGeometry :: GenerateTrianglesAndVertices()
   {
     log->info("Create triangles and vertices with " + std::to_string(num_threads)  + " threads...");
@@ -157,7 +92,7 @@ namespace voxel2stl
           for (size_t iz = 0; iz < data->Getnz()-1; iz++)
             if((ix+iy)%2)
               if((ix+iz)%2)
-                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()], nullptr);
+                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
       }
 
     size_t sum_size = 0;
@@ -180,7 +115,7 @@ namespace voxel2stl
           for (size_t iz = 0; iz < data->Getnz()-1; iz++)
             if((ix+iy)%2)
               if(!((ix+iz)%2))
-                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()], &vertices);
+                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
       }
 
     for(auto i : Range(num_threads))
@@ -201,7 +136,7 @@ namespace voxel2stl
           for (size_t iz = 0; iz < data->Getnz()-1; iz++)
             if(!((ix+iy)%2))
               if((ix+iz)%2)
-                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()], &vertices);
+                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
       }
 
     for(auto i : Range(num_threads))
@@ -222,7 +157,7 @@ namespace voxel2stl
           for (size_t iz = 0; iz < data->Getnz()-1; iz++)
             if(!((ix+iy)%2))
               if(!((ix+iz)%2))
-                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()], &vertices);
+                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
       }
 
     for(auto i : Range(num_threads))
@@ -334,7 +269,7 @@ namespace voxel2stl
         v[2] = triangles[i]->v3;
         Array<Vertex*> vertex(3);
         for (int j = 0; j<3; j++) vertex[j] = NULL;
-        triangles[i]->MakeSubdivisionVertex(openVertices,vertex,newVertices);
+        triangles[i]->MakeSubdivisionVertex(openVertices,vertex,newVertices,voxel_to_vertex);
         triangles.Append(make_unique<Triangle>(v[0], vertex[2], vertex[1], true));
         auto tri1 = &*triangles[triangles.Size()-1];
         triangles.Append(make_unique<Triangle>(v[1], vertex[0], vertex[2], true));
@@ -392,13 +327,13 @@ namespace voxel2stl
         triangles.DeleteElement(i);
       }
     }
+    int new_cluster = vertex_clustering.Size();
+    vertex_clustering.Append(make_unique<Array<Vertex*>>(newVertices.Size()));
+    vertex_clustering[new_cluster]->SetSize(0);
     for (int i = 0; i<newVertices.Size(); i++){
+      vertex_clustering[new_cluster]->Append(&*newVertices[i]);
       vertices.Append(move(newVertices[i]));
     }
-
-    //    QuickSortVertices(0, vertices.Size());
-    //return sum;
-
   }
 
   void VoxelSTLGeometry :: MinimizeEnergy(double weight_area, double weight_minimum)
@@ -485,12 +420,12 @@ namespace voxel2stl
   }
 
   void VoxelSTLGeometry :: GenerateTVCube(int x, int y, int z,
-                                          Array<unique_ptr<Vertex>>& thread_vertices,
-                                          Array<unique_ptr<Vertex>>* global_vertices)
+                                          Array<unique_ptr<Vertex>>& thread_vertices)
   {
     SPDLOG_DEBUG(log, "Start cube (" + to_string(x) + "," + to_string(y) + "," + to_string(z) + ")");
     int one = 1;
     //flip cube diagonal every second step to match faces of tetraeders inside
+    int x_old = x; int y_old = y; int z_old = z;
     if((x+y+z)%2 == 0)
       {
         x++; y++; z++; one=-1;
@@ -512,7 +447,7 @@ namespace voxel2stl
     // first tetraeder
     Array<Vertex*> tet1;
     if(p000-p100) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y,z,x+one,y,z);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z,x+one,y,z);
       assert(nvert);
       tet1 += nvert;
       local_vertices.Append(nvert);
@@ -521,7 +456,7 @@ namespace voxel2stl
       else{px=x+one;py=y;pz=z;}
     }
     if(p000-p010) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y,z,x,y+one,z);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z,x,y+one,z);
       assert(nvert);
       tet1 += nvert;
       local_vertices.Append(nvert);
@@ -530,7 +465,7 @@ namespace voxel2stl
       else{px=x;py=y+one;pz=z;}
     }
     if(p000-p001) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y,z,x,y,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z,x,y,z+one);
       assert(nvert);
       tet1 += nvert;
       local_vertices.Append(nvert);
@@ -539,7 +474,7 @@ namespace voxel2stl
       else{px=x;py=y;pz=z+one;}
     }
     if(p100-p010) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z,x,y+one,z);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y+one,z);
       assert(nvert);
       tet1 += nvert;
       local_vertices.Append(nvert);
@@ -548,7 +483,7 @@ namespace voxel2stl
       else{px=x;py=y+one;pz=z;}
     }
     if(p100-p001) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z,x,y,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y,z+one);
       assert(nvert);
       tet1 += nvert;
       local_vertices.Append(nvert);
@@ -557,7 +492,7 @@ namespace voxel2stl
       else{px=x;py=y;pz=z+one;}
     }
     if(p010-p001) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y+one,z,x,y,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x,y,z+one);
       assert(nvert);
       tet1 += nvert;
       local_vertices.Append(nvert);
@@ -586,7 +521,7 @@ namespace voxel2stl
     Array<Vertex*> tet2;
     count = 0;
     if(p100-p110) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z);
       assert(nvert);
       local_vertices.Append(nvert);
       tet2 += nvert;
@@ -595,7 +530,7 @@ namespace voxel2stl
       else{px=x+one;py=y+one;pz=z;}
     }
     if(p110-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y+one,z,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y+one,z,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet2 += nvert;
@@ -604,7 +539,7 @@ namespace voxel2stl
       else{px=x+one;py=y+one;pz=z+one;}
     }
     if(p100-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet2 += nvert;
@@ -613,7 +548,7 @@ namespace voxel2stl
       else{px=x+one;py=y+one;pz=z+one;}
     }
     if(p010-p110) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z);
       assert(nvert);
       local_vertices.Append(nvert);
       tet2 += nvert;
@@ -622,7 +557,7 @@ namespace voxel2stl
       else{px=x+one;py=y+one;pz=z;}
     }
     if(p100-p010) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z,x,y+one,z);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y+one,z);
       assert(nvert);
       local_vertices.Append(nvert);
       tet2 += nvert;
@@ -631,7 +566,7 @@ namespace voxel2stl
       else{px=x;py=y+one;pz=z;}
     }
     if(p010-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet2 += nvert;
@@ -659,7 +594,7 @@ namespace voxel2stl
     Array<Vertex*> tet3;
     count = 0;
     if(p100-p001) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z,x,y,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet3 += nvert;
@@ -668,7 +603,7 @@ namespace voxel2stl
       else{px=x;py=y;pz=z+one;}
     }
     if(p100-p101) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z,x+one,y,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x+one,y,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet3 += nvert;
@@ -677,7 +612,7 @@ namespace voxel2stl
       else{px=x+one;py=y;pz=z+one;}
     }
     if(p001-p101) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y,z+one,x+one,y,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x+one,y,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet3 += nvert;
@@ -686,7 +621,7 @@ namespace voxel2stl
       else{px=x+one;py=y;pz=z+one;}
     }
     if(p100-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet3 += nvert;
@@ -695,7 +630,7 @@ namespace voxel2stl
       else{px=x+one;py=y+one;pz=z+one;}
     }
     if(p001-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y,z+one,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet3 += nvert;
@@ -704,7 +639,7 @@ namespace voxel2stl
       else{px=x+one;py=y+one;pz=z+one;}
     }
     if(p101-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z+one,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z+one,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet3 += nvert;
@@ -733,7 +668,7 @@ namespace voxel2stl
     Array<Vertex*> tet4;
     count = 0;
     if(p001-p010) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y,z+one,x,y+one,z);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x,y+one,z);
       assert(nvert);
       local_vertices.Append(nvert);
       tet4 += nvert;
@@ -742,7 +677,7 @@ namespace voxel2stl
       else{px=x;py=y+one;pz=z;}
     }
     if(p001-p011) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y,z+one,x,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet4 += nvert;
@@ -751,7 +686,7 @@ namespace voxel2stl
       else{px=x;py=y+one;pz=z+one;}
     }
     if(p010-p011) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y+one,z,x,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet4 += nvert;
@@ -760,7 +695,7 @@ namespace voxel2stl
       else{px=x;py=y+one;pz=z+one;}
     }
     if(p001-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y,z+one,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet4 += nvert;
@@ -769,7 +704,7 @@ namespace voxel2stl
       else{px=x+one;py=y+one;pz=z+one;}
     }
     if(p010-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet4 += nvert;
@@ -778,7 +713,7 @@ namespace voxel2stl
       else{px=x+one;py=y+one;pz=z+one;}
     }
     if(p011-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y+one,z+one,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z+one,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet4 += nvert;
@@ -806,7 +741,7 @@ namespace voxel2stl
     Array<Vertex*> tet5;
     count = 0;
     if(p100-p001) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z,x,y,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet5 += nvert;
@@ -815,7 +750,7 @@ namespace voxel2stl
       else{px=x;py=y;pz=z+one;}
     }
     if(p100-p010) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z,x,y+one,z);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y+one,z);
       assert(nvert);
       local_vertices.Append(nvert);
       tet5 += nvert;
@@ -824,7 +759,7 @@ namespace voxel2stl
       else{px=x;py=y+one;pz=z;}
     }
     if(p010-p001) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y+one,z,x,y,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x,y,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet5 += nvert;
@@ -833,7 +768,7 @@ namespace voxel2stl
       else{px=x;py=y;pz=z+one;}
     }
     if(p100-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet5 += nvert;
@@ -842,7 +777,7 @@ namespace voxel2stl
       else{px=x+one;py=y+one;pz=z+one;}
     }
     if(p001-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y,z+one,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet5 += nvert;
@@ -851,7 +786,7 @@ namespace voxel2stl
       else{px=x+one;py=y+one;pz=z+one;}
     }
     if(p010-p111) {
-      auto nvert = MakeVertex(global_vertices, local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z+one);
+      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z+one);
       assert(nvert);
       local_vertices.Append(nvert);
       tet5 += nvert;
@@ -880,10 +815,8 @@ namespace voxel2stl
   // create new vertex and store unique_ptr to it in vertices, put pointer in openVertices and return
   // pointer to that new vertex
   
-  // TODO: in first round we could search for existing vertices only in current voxel
   VoxelSTLGeometry::Vertex* VoxelSTLGeometry ::
-  MakeVertex(Array<unique_ptr<Vertex>>* global_vertices,
-             Array<Vertex*>& local_vertices,
+  MakeVertex(Array<Vertex*>& local_vertices,
              Array<unique_ptr<Vertex>>& thread_vertices,
              int x1, int y1, int z1, int x2, int y2, int z2)
   {
@@ -904,23 +837,25 @@ namespace voxel2stl
           SPDLOG_DEBUG(log, "Vertex " + vert->to_string() + " found in local vertices");
           return vert;
         }
-    if (global_vertices)
+    auto itV = voxel_to_vertex.find(make_tuple(x1,y1,z1,x2,y2,z2));
+    if(itV != voxel_to_vertex.end())
       {
-        for(auto& vert : *global_vertices)
-          if (vert->doIhave(x,y))
-            {
-              SPDLOG_DEBUG(log, "Vertex " + vert->to_string() + " found in global vertices");
-              return &*vert;
-            }
+        SPDLOG_DEBUG(log, "Vertex " + itV->second->to_string() + " found in global vertices");
+        return itV->second;
       }
+
     auto newVertex = make_unique<Vertex>(x,y);
     auto nvert = &*newVertex;
+    voxel_to_vertex[make_tuple(x1,y1,z1,x2,y2,z2)] = nvert;
     SPDLOG_DEBUG(log, "Created new vertex " + nvert->to_string());
     thread_vertices.Append(move(newVertex));
     return nvert;
   }
 
-  void VoxelSTLGeometry::Triangle::MakeSubdivisionVertex(Array<Vertex*>& openVertices, Array<Vertex*>& vertex, Array<unique_ptr<Vertex>>& newVertices){
+  void VoxelSTLGeometry::Triangle::
+  MakeSubdivisionVertex(Array<Vertex*>& openVertices, Array<Vertex*>& vertex,
+                        Array<unique_ptr<Vertex>>& newVertices,
+                        std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*>& vox_to_vert){
     bool deleteVertex = false;
     for(int i = openVertices.Size()-1; i>=0; i--){
       deleteVertex = false;
@@ -962,18 +897,24 @@ namespace voxel2stl
       auto newv = make_unique<Vertex>(v1,v2);
       vertex[2] = &*newv;
       openVertices.Append(&*newv);
+      vox_to_vert[make_tuple(newv->x[0],newv->x[1],newv->x[2],
+                                 newv->y[0],newv->y[1],newv->y[2])] = &*newv;
       newVertices.Append(move(newv));
     }
     if(vertex[1] == NULL){
       auto newv = make_unique<Vertex>(v1,v3);
       vertex[1] = &* newv;
       openVertices.Append(&*newv);
+      vox_to_vert[make_tuple(newv->x[0],newv->x[1],newv->x[2],
+                                 newv->y[0],newv->y[1],newv->y[2])] = &*newv;
       newVertices.Append(move(newv));
     }
     if(vertex[0] == NULL){
       auto newv = make_unique<Vertex>(v2,v3);
       vertex[0] = &*newv;
       openVertices.Append(&*newv);
+      vox_to_vert[make_tuple(newv->x[0],newv->x[1],newv->x[2],
+                                 newv->y[0],newv->y[1],newv->y[2])] = &*newv;
       newVertices.Append(move(newv));
     }
     for (int i = 0; i<3; i++){
@@ -981,25 +922,6 @@ namespace voxel2stl
         if (i!=j && vertex[i] == vertex[j]) cout << "error---------------------------------------------" << endl;
       }
     }
-  }
-
-  void VoxelSTLGeometry :: QuickSortVertices(size_t low, size_t up)
-  {
-    if (up-low < 2) return;
-    auto i = low;
-    auto j = up-1;
-    auto & midval = *vertices[(i+j)/2];
-    do
-      {
-        while (vertices[i]->x[0] < midval.x[0]) i++;
-        while (midval.x[0] < vertices[j]->x[0]) j--;
-        auto tmp = move(vertices[i]);
-        vertices[i] = move(vertices[j]);
-        vertices[j] = move(tmp);
-        i++; j--;
-      } while(i <= j);
-    QuickSortVertices(low,j+1);
-    QuickSortVertices(i,up);
   }
 
   double Newton(std::function<double (double)>  func, double r0, double &energydifference, double & energy){
