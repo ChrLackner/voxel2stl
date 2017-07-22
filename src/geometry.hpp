@@ -15,6 +15,7 @@ namespace voxel2stl
     int num_threads;
     Array<unique_ptr<Array<Vertex*>>> vertex_clustering;
     shared_ptr<Array<int>> materials, boundaries;
+    std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*> voxel_to_vertex;
 
   public:
     VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<int>> amaterials, shared_ptr<Array<int>> aboundaries, shared_ptr<spdlog::logger> log);

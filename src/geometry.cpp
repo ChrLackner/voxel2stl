@@ -491,6 +491,7 @@ namespace voxel2stl
     SPDLOG_DEBUG(log, "Start cube (" + to_string(x) + "," + to_string(y) + "," + to_string(z) + ")");
     int one = 1;
     //flip cube diagonal every second step to match faces of tetraeders inside
+    int x_old = x; int y_old = y; int z_old = z;
     if((x+y+z)%2 == 0)
       {
         x++; y++; z++; one=-1;
@@ -904,17 +905,18 @@ namespace voxel2stl
           SPDLOG_DEBUG(log, "Vertex " + vert->to_string() + " found in local vertices");
           return vert;
         }
-    if (global_vertices)
+    auto itV = voxel_to_vertex.find(make_tuple(std::min(x1,x2),std::min(y1,y2),std::min(z1,z2),
+                                               std::max(x1,x2),std::max(y1,y2),std::max(y1,y2)));
+    if(itV != voxel_to_vertex.end())
       {
-        for(auto& vert : *global_vertices)
-          if (vert->doIhave(x,y))
-            {
-              SPDLOG_DEBUG(log, "Vertex " + vert->to_string() + " found in global vertices");
-              return &*vert;
-            }
+        SPDLOG_DEBUG(log, "Vertex " + itV->second->to_string() + " found in global vertices");
+        return itV->second;
       }
+
     auto newVertex = make_unique<Vertex>(x,y);
     auto nvert = &*newVertex;
+    voxel_to_vertex[make_tuple(std::min(x1,x2),std::min(y1,y2),std::min(z1,z2),
+                               std::max(x1,x2),std::max(y1,y2),std::max(y1,y2))] = nvert;
     SPDLOG_DEBUG(log, "Created new vertex " + nvert->to_string());
     thread_vertices.Append(move(newVertex));
     return nvert;
