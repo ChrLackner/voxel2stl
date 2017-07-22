@@ -175,50 +175,23 @@ namespace voxel2stl
   void VoxelSTLGeometry :: PartitionVertices()
   {
     log->info("Start partitioning of vertices...");
-    vertex_clustering.SetSize(0);
-    Array<Vertex*> openVerticesThisLevel(vertices.Size()); // just reserve the size
-    Array<Vertex*> openVerticesNextLevel(vertices.Size());
-    openVerticesThisLevel.SetSize(0);
-    for (size_t i = 0; i < vertices.Size(); i++)
-      openVerticesNextLevel[i] = &* vertices[i];
-    int level = 0;
-    while(openVerticesNextLevel.Size())
+    Array<size_t> cluster_count;
+    for (auto& vert : vertices)
       {
-        for(auto v : openVerticesNextLevel)
-          openVerticesThisLevel.Append(v);
-        openVerticesNextLevel.SetSize(0);
-        vertex_clustering.Append(make_unique<Array<Vertex*>>(openVerticesThisLevel.Size()));
-        vertex_clustering[level]->SetSize(0);
-        while(openVerticesThisLevel.Size())
-          {
-            Vertex* vert = openVerticesThisLevel[0];
-            vertex_clustering[level]->Append(vert);
-            openVerticesThisLevel.DeleteElement(0);
-            for (auto trig : vert->neighbours)
-              {
-                for (auto v : { trig->v1, trig->v2, trig->v3})
-                  {
-                    if (openVerticesThisLevel.Contains(v))
-                      {
-                        openVerticesThisLevel.DeleteElement(openVerticesThisLevel.Pos(v));
-                        openVerticesNextLevel.Append(v);
-                      }
-                    // for (auto outer_trig : v->neighbours)
-                    //   {
-                    //     for (auto outer_v : { outer_trig->OtherVertices(v,1),
-                    //           outer_trig->OtherVertices(v,2)})
-                    //       {
-                    //         if (openVerticesThisLevel.Contains(outer_v))
-                    //           {
-                    //             openVerticesThisLevel.DeleteElement(openVerticesThisLevel.Pos(outer_v));
-                    //             openVerticesNextLevel.Append(outer_v);
-                    //           }
-                    //       }
-                    //   }
-                  }
-              }
-          }
-        level++;
+        while(cluster_count.Size()<vert->cluster+1)
+          cluster_count.Append(0);
+        cluster_count[vert->cluster]++;
+      }
+
+    for(auto i : Range(cluster_count.Size()))
+      vertex_clustering.Append(make_unique<Array<Vertex*>>());
+
+    for(auto i : Range(cluster_count.Size()))
+      vertex_clustering[i]->SetAllocSize(cluster_count[i]);
+
+    for (auto& vert : vertices)
+      {
+        vertex_clustering[vert->cluster]->Append(&*vert);
       }
     log->debug("Using " + std::to_string(vertex_clustering.Size()) + " clusters for the vertices");
     log->debug("In total there are " + std::to_string(vertices.Size()) + " vertices");
@@ -319,21 +292,52 @@ namespace voxel2stl
             n1->OtherVertices(visavisVertex,2)->addNeighbour(tri12);
           }
         }
+        for (auto vert : vertex)
+          {
+            size_t cluster = 0;
+            bool has_neighbour_in_cluster = true;
+            while(has_neighbour_in_cluster)
+              {
+                has_neighbour_in_cluster = false;
+                for(auto trig : vert->neighbours)
+                  for(auto other : {trig->v1, trig->v2, trig->v3})
+                    if(other->cluster==cluster)
+                      {
+                        has_neighbour_in_cluster = true;
+                        cluster++;
+                      }
+              }
+            SPDLOG_DEBUG(log, "Vertex changed to cluster " + to_string(cluster));
+            vert->cluster = cluster;
+          }
+      }
+    }
+    for (size_t j=0; j<trianglesOriginalSize; j++)
+      {
+        size_t i = trianglesOriginalSize-1-j;
+        if (triangles[i]->subdivisionParameter > 0) {
+          triangles.DeleteElement(i);
+      }
+    }
+    Array<size_t> cluster_count;
+    for (auto& vert : newVertices)
+      {
+        while(cluster_count.Size()<vert->cluster+1)
+          cluster_count.Append(0);
+        cluster_count[vert->cluster]++;
+      }
 
+    while(cluster_count.Size() > vertex_clustering.Size())
+      vertex_clustering.Append(make_unique<Array<Vertex*>>());
+
+    for(auto i : Range(cluster_count.Size()))
+      vertex_clustering[i]->SetAllocSize(vertex_clustering[i]->Size() + cluster_count[i]);
+
+    for (auto& vert : newVertices)
+      {
+        vertex_clustering[vert->cluster]->Append(&*vert);
+        vertices.Append(move(vert));
       }
-    }
-    for (size_t i=trianglesOriginalSize-1; i>=0; i--){
-      if (triangles[i]->subdivisionParameter > 0) {
-        triangles.DeleteElement(i);
-      }
-    }
-    size_t new_cluster = vertex_clustering.Size();
-    vertex_clustering.Append(make_unique<Array<Vertex*>>(newVertices.Size()));
-    vertex_clustering[new_cluster]->SetSize(0);
-    for (size_t i = 0; i<newVertices.Size(); i++){
-      vertex_clustering[new_cluster]->Append(&*newVertices[i]);
-      vertices.Append(move(newVertices[i]));
-    }
   }
 
   void VoxelSTLGeometry :: MinimizeEnergy(double weight_area, double weight_minimum)
@@ -835,17 +839,49 @@ namespace voxel2stl
       if (vert->doIhave(x,y))
         {
           SPDLOG_DEBUG(log, "Vertex " + vert->to_string() + " found in local vertices");
+          size_t cluster = 0;
+          bool has_neighbour_in_cluster = true;
+          while(has_neighbour_in_cluster)
+            {
+              has_neighbour_in_cluster = false;
+              for(auto trig : vert->neighbours)
+                for(auto other : {trig->v1, trig->v2, trig->v3})
+                  if(other->cluster==cluster)
+                    {
+                      has_neighbour_in_cluster = true;
+                      cluster++;
+                    }
+            }
+          SPDLOG_DEBUG(log, "Vertex changed to cluster " + to_string(cluster));
+          vert->cluster = cluster;
           return vert;
         }
     auto itV = voxel_to_vertex.find(make_tuple(x1,y1,z1,x2,y2,z2));
     if(itV != voxel_to_vertex.end())
       {
-        SPDLOG_DEBUG(log, "Vertex " + itV->second->to_string() + " found in global vertices");
-        return itV->second;
+        auto vert = itV->second;
+        SPDLOG_DEBUG(log, "Vertex " + vert->to_string() + " found in global vertices");
+        size_t cluster = 0;
+        bool has_neighbour_in_cluster = true;
+        while(has_neighbour_in_cluster)
+          {
+            has_neighbour_in_cluster = false;
+            for(auto trig : vert->neighbours)
+              for(auto other : {trig->v1, trig->v2, trig->v3})
+                if(other->cluster==cluster)
+                  {
+                    has_neighbour_in_cluster = true;
+                    cluster++;
+                  }
+          }
+          SPDLOG_DEBUG(log, "Vertex changed to cluster " + to_string(cluster));
+          vert->cluster = cluster;
+        return vert;
       }
 
     auto newVertex = make_unique<Vertex>(x,y);
     auto nvert = &*newVertex;
+    nvert->cluster = 0;
     voxel_to_vertex[make_tuple(x1,y1,z1,x2,y2,z2)] = nvert;
     SPDLOG_DEBUG(log, "Created new vertex " + nvert->to_string());
     thread_vertices.Append(move(newVertex));
@@ -857,64 +893,72 @@ namespace voxel2stl
                         Array<unique_ptr<Vertex>>& newVertices,
                         std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*>& vox_to_vert){
     bool deleteVertex = false;
-    for(size_t i = openVertices.Size()-1; i>=0; i--){
-      deleteVertex = false;
-      bool go = true;
-      for (int j= 0; j<3 && go; j++){
-        if (abs(openVertices[i]->x[j] - 0.5*(v1->x[j] + v2->x[j]))>1e-7 || abs(openVertices[i]->y[j] - 0.5*(v1->y[j] + v2->y[j]))>1e-7) {
-          go = false;
+    for(size_t j = 0; j < openVertices.Size(); j++)
+      {
+        size_t i = openVertices.Size()-1-j;
+        deleteVertex = false;
+        bool go = true;
+        for (int j= 0; j<3 && go; j++){
+          if (abs(openVertices[i]->x[j] - 0.5*(v1->x[j] + v2->x[j]))>1e-7 || abs(openVertices[i]->y[j] - 0.5*(v1->y[j] + v2->y[j]))>1e-7) {
+            go = false;
+          }
+        }
+        if(go){
+          vertex[2]=openVertices[i];
+          deleteVertex == true;
+        }
+        go = !deleteVertex ;
+        for (int j= 0; j<3 && go; j++){
+          if (abs(openVertices[i]->x[j] - 0.5*(v1->x[j] + v3->x[j]))>1e-7 || abs(openVertices[i]->y[j] - 0.5*(v1->y[j] + v3->y[j]))>1e-7) {
+            go = false;
+          }
+        }
+        if(go){
+          vertex[1]=openVertices[i];
+          deleteVertex == true;
+        }
+        go = !deleteVertex;
+        for (int j= 0; j<3 && go; j++){
+          if (abs(openVertices[i]->x[j] - 0.5*(v2->x[j] + v3->x[j]))>1e-7 || abs(openVertices[i]->y[j] - 0.5*(v2->y[j] + v3->y[j]))>1e-7) {
+            go = false;
+          }
+        }
+        if(go){
+          vertex[0]=openVertices[i];
+          deleteVertex == true;
+        }
+        if(deleteVertex){
+          openVertices.DeleteElement(i);
         }
       }
-      if(go){
-        vertex[2]=openVertices[i];
-        deleteVertex == true;
-      }
-      go = !deleteVertex ;
-      for (int j= 0; j<3 && go; j++){
-        if (abs(openVertices[i]->x[j] - 0.5*(v1->x[j] + v3->x[j]))>1e-7 || abs(openVertices[i]->y[j] - 0.5*(v1->y[j] + v3->y[j]))>1e-7) {
-          go = false;
-        }
-      }
-      if(go){
-        vertex[1]=openVertices[i];
-        deleteVertex == true;
-      }
-      go = !deleteVertex;
-      for (int j= 0; j<3 && go; j++){
-        if (abs(openVertices[i]->x[j] - 0.5*(v2->x[j] + v3->x[j]))>1e-7 || abs(openVertices[i]->y[j] - 0.5*(v2->y[j] + v3->y[j]))>1e-7) {
-          go = false;
-        }
-      }
-      if(go){
-        vertex[0]=openVertices[i];
-        deleteVertex == true;
-      }
-      if(deleteVertex){
-        openVertices.DeleteElement(i);
-      }
-    }
     if(vertex[2] == NULL){
       auto newv = make_unique<Vertex>(v1,v2);
-      vertex[2] = &*newv;
-      openVertices.Append(&*newv);
+      auto vert = &*newv;
+      SPDLOG_DEBUG(log, "Created new subdivision vertex " + vert->to_string());
+      vertex[2] = vert;
+      openVertices.Append(vert);
       vox_to_vert[make_tuple(newv->x[0],newv->x[1],newv->x[2],
-                                 newv->y[0],newv->y[1],newv->y[2])] = &*newv;
+                             newv->y[0],newv->y[1],newv->y[2])] = &*newv;
       newVertices.Append(move(newv));
     }
     if(vertex[1] == NULL){
       auto newv = make_unique<Vertex>(v1,v3);
-      vertex[1] = &* newv;
-      openVertices.Append(&*newv);
+      auto vert = &*newv;
+      SPDLOG_DEBUG(log, "Created new subdivision vertex " + vert->to_string());
+      vertex[1] = vert;
+      openVertices.Append(vert);
       vox_to_vert[make_tuple(newv->x[0],newv->x[1],newv->x[2],
-                                 newv->y[0],newv->y[1],newv->y[2])] = &*newv;
+                             newv->y[0],newv->y[1],newv->y[2])] = &*newv;
       newVertices.Append(move(newv));
     }
     if(vertex[0] == NULL){
       auto newv = make_unique<Vertex>(v2,v3);
-      vertex[0] = &*newv;
-      openVertices.Append(&*newv);
+      auto vert = &*newv;
+      SPDLOG_DEBUG(log, "Created new subdivision vertex " + vert->to_string());
+      vertex[0] = vert;
+      openVertices.Append(vert);
       vox_to_vert[make_tuple(newv->x[0],newv->x[1],newv->x[2],
-                                 newv->y[0],newv->y[1],newv->y[2])] = &*newv;
+                             newv->y[0],newv->y[1],newv->y[2])] = &*newv;
       newVertices.Append(move(newv));
     }
     for (int i = 0; i<3; i++){

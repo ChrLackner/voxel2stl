@@ -57,6 +57,8 @@ namespace voxel2stl
       double ratio;
       int nn = 0; //number of neighbours
       Array<Triangle*> neighbours;
+      // cluster of vertex coloring
+      size_t cluster;
 
       Vertex(Vec<3,double> ax, Vec<3,double> ay) : x(ax), y(ay){
         SetRatio(0.5); }
