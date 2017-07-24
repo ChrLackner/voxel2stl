@@ -934,7 +934,6 @@ namespace voxel2stl
     if(vertex[2] == NULL){
       auto newv = make_unique<Vertex>(v1,v2);
       auto vert = &*newv;
-      SPDLOG_DEBUG(log, "Created new subdivision vertex " + vert->to_string());
       vertex[2] = vert;
       openVertices.Append(vert);
       vox_to_vert[make_tuple(newv->x[0],newv->x[1],newv->x[2],
@@ -944,7 +943,6 @@ namespace voxel2stl
     if(vertex[1] == NULL){
       auto newv = make_unique<Vertex>(v1,v3);
       auto vert = &*newv;
-      SPDLOG_DEBUG(log, "Created new subdivision vertex " + vert->to_string());
       vertex[1] = vert;
       openVertices.Append(vert);
       vox_to_vert[make_tuple(newv->x[0],newv->x[1],newv->x[2],
@@ -954,7 +952,6 @@ namespace voxel2stl
     if(vertex[0] == NULL){
       auto newv = make_unique<Vertex>(v2,v3);
       auto vert = &*newv;
-      SPDLOG_DEBUG(log, "Created new subdivision vertex " + vert->to_string());
       vertex[0] = vert;
       openVertices.Append(vert);
       vox_to_vert[make_tuple(newv->x[0],newv->x[1],newv->x[2],
