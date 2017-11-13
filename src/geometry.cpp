@@ -484,16 +484,34 @@ namespace voxel2stl
             auto vert = tet[i];
             size_t cluster = 0;
             bool has_neighbour_in_cluster = true;
-            while(has_neighbour_in_cluster)
+            auto check_neighbour_in_cluster = [](auto vert, auto cluster)
               {
-                has_neighbour_in_cluster = false;
                 for(auto trig : vert->neighbours)
                   for(auto other : {trig->v1, trig->v2, trig->v3})
-                    if(other->cluster==cluster)
+                    // if(other!=vert && other->cluster==cluster)
+                    //   {
+                    //     has_neighbour_in_cluster = true;
+                    //     cluster++;
+                    //   }
+                // larger vertex patch:
+                    if (other!=vert)
                       {
-                        has_neighbour_in_cluster = true;
-                        cluster++;
+                        for (auto othertrig : other->neighbours)
+                          {
+                            for (auto vpatch : {othertrig->v1, othertrig->v2, othertrig->v3})
+                              {
+                                if(vpatch!=vert && vpatch->cluster==cluster)
+                                  {
+                                    return true;
+                                  }
+                              }
+                          }
                       }
+                return false;
+              };
+            while(check_neighbour_in_cluster(vert,cluster))
+              {
+                cluster++;
               }
             SPDLOG_DEBUG(log, "Vertex changed to cluster " + to_string(cluster));
             vert->cluster = cluster;
