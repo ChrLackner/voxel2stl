@@ -85,91 +85,33 @@ namespace voxel2stl
     Array<unique_ptr<Vertex>> thread_vertices[num_threads];
     log->debug("Data size is " + to_string(data->Getnx()) + " x " + to_string(data->Getny()) + " x " +
                to_string(data->Getnz()));
-#pragma omp parallel for
-    for (size_t ix=0; ix<data->Getnx()-1; ix++)
-      {
-        for (size_t iy=0; iy<data->Getny()-1;iy++)
-          for (size_t iz = 0; iz < data->Getnz()-1; iz++)
-            if((ix+iy)%2)
-              if((ix+iz)%2)
-                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
-      }
 
     size_t sum_size = 0;
-    for(auto i : Range(num_threads))
-      sum_size += thread_vertices[i].Size();
-    vertices.SetAllocSize(sum_size);
-    for(auto i : Range(num_threads))
+    for(auto ixiy : {true,false})
       {
-        for(auto j : Range(thread_vertices[i].Size()))
-          vertices.Append(move(thread_vertices[i][j]));
-        thread_vertices[i].SetSize(0);
-      }
-
-    log->debug("Num vertices created after first round = " + std::to_string(sum_size));
-
+        for(auto ixiz : {true,false})
+          {
 #pragma omp parallel for
-    for (size_t ix=0; ix<data->Getnx()-1; ix++)
-      {
-        for (size_t iy=0; iy<data->Getny()-1;iy++)
-          for (size_t iz = 0; iz < data->Getnz()-1; iz++)
-            if((ix+iy)%2)
-              if(!((ix+iz)%2))
-                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
+            for (size_t ix=0; ix<data->Getnx()-1; ix++)
+              {
+                for (size_t iy=0; iy<data->Getny()-1;iy++)
+                  for (size_t iz = 0; iz < data->Getnz()-1; iz++)
+                    if((ix+iy)%2==ixiy)
+                      if((ix+iz)%2==ixiz)
+                        GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
+              }
+            for(auto i : Range(num_threads))
+              sum_size += thread_vertices[i].Size();
+            vertices.SetAllocSize(sum_size);
+            for(auto i : Range(num_threads))
+              {
+                for(auto j : Range(thread_vertices[i].Size()))
+                  vertices.Append(move(thread_vertices[i][j]));
+                thread_vertices[i].SetSize(0);
+              }
+            log->debug("Num vertices created after first round = " + std::to_string(sum_size));
+          }
       }
-
-    for(auto i : Range(num_threads))
-      sum_size += thread_vertices[i].Size();
-    vertices.SetAllocSize(sum_size);
-    for(auto i : Range(num_threads))
-      {
-        for(auto j : Range(thread_vertices[i].Size()))
-          vertices.Append(move(thread_vertices[i][j]));
-        thread_vertices[i].SetSize(0);
-      }
-    log->debug("Num vertices created after second round = " + std::to_string(sum_size));
-
-#pragma omp parallel for
-    for (size_t ix=0; ix<data->Getnx()-1; ix++)
-      {
-        for (size_t iy=0; iy<data->Getny()-1;iy++)
-          for (size_t iz = 0; iz < data->Getnz()-1; iz++)
-            if(!((ix+iy)%2))
-              if((ix+iz)%2)
-                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
-      }
-
-    for(auto i : Range(num_threads))
-      sum_size += thread_vertices[i].Size();
-    vertices.SetAllocSize(sum_size);
-    for(auto i : Range(num_threads))
-      {
-        for(auto j : Range(thread_vertices[i].Size()))
-          vertices.Append(move(thread_vertices[i][j]));
-        thread_vertices[i].SetSize(0);
-      }
-    log->debug("Num vertices created after third round = " + std::to_string(sum_size));
-    
-#pragma omp parallel for
-    for (size_t ix=0; ix<data->Getnx()-1; ix++)
-      {
-        for (size_t iy=0; iy<data->Getny()-1;iy++)
-          for (size_t iz = 0; iz < data->Getnz()-1; iz++)
-            if(!((ix+iy)%2))
-              if(!((ix+iz)%2))
-                GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
-      }
-
-    for(auto i : Range(num_threads))
-      sum_size += thread_vertices[i].Size();
-    vertices.SetAllocSize(sum_size);
-    for(auto i : Range(num_threads))
-      {
-        for(auto j : Range(thread_vertices[i].Size()))
-          vertices.Append(move(thread_vertices[i][j]));
-        thread_vertices[i].SetSize(0);
-      }
-    log->debug("Num vertices created after fourth round = " + std::to_string(sum_size));
   }
 
   void VoxelSTLGeometry :: PartitionVertices()
