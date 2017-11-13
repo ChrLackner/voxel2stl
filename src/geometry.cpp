@@ -434,394 +434,77 @@ namespace voxel2stl
       {
         x++; y++; z++; one=-1;
       }
-    bool p000 = isUsedVoxel(x,y,z);
-    bool p100 = isUsedVoxel(x+one,y,z);
-    bool p010 = isUsedVoxel(x,y+one,z);
-    bool p001 = isUsedVoxel(x,y,z+one);
-    bool p110 = isUsedVoxel(x+one,y+one,z);
-    bool p101 = isUsedVoxel(x+one,y,z+one);
-    bool p011 = isUsedVoxel(x,y+one,z+one);
-    bool p111 = isUsedVoxel(x+one,y+one,z+one);
-    if (!p000 && !p100 && !p010 && !p001 && !p110 && !p101 && !p011 && !p111)
+
+    bool isused[8] = {isUsedVoxel(x,y,z),isUsedVoxel(x,y,z+one),isUsedVoxel(x,y+one,z),
+                      isUsedVoxel(x,y+one,z+one),isUsedVoxel(x+one,y,z),isUsedVoxel(x+one,y,z+one),
+                      isUsedVoxel(x+one,y+one,z),isUsedVoxel(x+one,y+one,z+one)};
+    if (std::all_of(std::begin(isused),std::end(isused),[](bool b) { return !b; }))
       return;
-    Array<Vertex*> local_vertices;
-
-    size_t px,py,pz;
-    size_t count = 0;
-    // first tetraeder
-    Array<Vertex*> tet1;
-    if(p000-p100) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z,x+one,y,z);
-      assert(nvert);
-      tet1 += nvert;
-      local_vertices.Append(nvert);
-      count++;
-      if(!p000){px=x;py=y;pz=z;}
-      else{px=x+one;py=y;pz=z;}
-    }
-    if(p000-p010) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z,x,y+one,z);
-      assert(nvert);
-      tet1 += nvert;
-      local_vertices.Append(nvert);
-      count++;
-      if(!p000){px=x;py=y;pz=z;}
-      else{px=x;py=y+one;pz=z;}
-    }
-    if(p000-p001) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z,x,y,z+one);
-      assert(nvert);
-      tet1 += nvert;
-      local_vertices.Append(nvert);
-      count++;
-      if(!p000){px=x;py=y;pz=z;}
-      else{px=x;py=y;pz=z+one;}
-    }
-    if(p100-p010) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y+one,z);
-      assert(nvert);
-      tet1 += nvert;
-      local_vertices.Append(nvert);
-      count++;
-      if(!p100){px=x+one;py=y;pz=z;}
-      else{px=x;py=y+one;pz=z;}
-    }
-    if(p100-p001) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y,z+one);
-      assert(nvert);
-      tet1 += nvert;
-      local_vertices.Append(nvert);
-      count++;
-      if(!p100){px=x+one;py=y;pz=z;}
-      else{px=x;py=y;pz=z+one;}
-    }
-    if(p010-p001) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x,y,z+one);
-      assert(nvert);
-      tet1 += nvert;
-      local_vertices.Append(nvert);
-      count++;
-      if(!p010){px=x;py=y+one;pz=z;}
-      else{px=x;py=y;pz=z+one;}
-    }
-    if(count >= 3) {
-      auto triangle11 = make_unique<Triangle>(tet1[0],tet1[1],tet1[2]);
-      for (int i=0; i<3; i++){
-        tet1[i]->addNeighbour(&*triangle11);
-      }
+    unsigned char combinations[5][6][2] = {{{0,4},{0,2},{0,1},{4,2},{4,1},{2,1}},
+                                           {{4,6},{6,7},{4,7},{2,6},{4,2},{2,7}},
+                                           {{4,1},{4,5},{1,5},{4,7},{1,7},{5,7}},
+                                           {{1,2},{1,3},{2,3},{1,7},{2,7},{3,7}},
+                                           {{4,1},{4,2},{2,1},{4,7},{1,7},{2,7}}};
+    for(auto& tets : combinations)
+      {
+        Array<Vertex*> tet;
+        size_t count = 0;
+        for(auto& i : tets)
+          {
+            if(isused[i[0]] - isused[i[1]])
+              {
+                auto nvert = MakeVertex(thread_vertices,
+                                        x+one*bool(i[0]&4),y+one*bool(i[0]&2),z+one*bool(i[0]&1),
+                                        x+one*bool(i[1]&4),y+one*bool(i[1]&2),z+one*bool(i[1]&1));
+                assert(nvert);
+                tet.Append(nvert);
+                count++;
+              }
+          }
+        if(count >= 3) {
+          auto triangle1 = make_unique<Triangle>(tet[0],tet[1],tet[2]);
+          SPDLOG_DEBUG(log,"Created new triangle1: " + triangle1->to_string());
+          for (int i=0; i<3; i++){
+            tet[i]->addNeighbour(&*triangle1);
+          }
 #pragma omp critical(triangles)
-      { triangles.Append(std::move(triangle11)); }
-    }
-    if(count==4){
-      auto triangle12 = make_unique<Triangle>(tet1[1],tet1[2],tet1[3]);
-      for (int i=1; i<4; i++){
-        tet1[i]->addNeighbour(&*triangle12);
-      }
+          { triangles.Append(std::move(triangle1)); }
+        }
+        if(count==4){
+          auto triangle2 = make_unique<Triangle>(tet[1],tet[2],tet[3]);
+          SPDLOG_DEBUG(log,"Created new triangle2: " + triangle2->to_string());
+          for (int i=1; i<4; i++){
+            tet[i]->addNeighbour(&*triangle2);
+          }
 #pragma omp critical(triangles)
-      { triangles.Append(std::move(triangle12)); }
-    }
-
-    // second tetraeder
-    Array<Vertex*> tet2;
-    count = 0;
-    if(p100-p110) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet2 += nvert;
-      count++;
-      if(!p100){px=x+one;py=y;pz=z;}
-      else{px=x+one;py=y+one;pz=z;}
-    }
-    if(p110-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y+one,z,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet2 += nvert;
-      count++;
-      if(!p110){px=x+one;py=y+one;pz=z;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(p100-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet2 += nvert;
-      count++;
-      if(!p100){px=x+one;py=y;pz=z;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(p010-p110) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet2 += nvert;
-      count++;
-      if(!p010){px=x;py=y+one;pz=z;}
-      else{px=x+one;py=y+one;pz=z;}
-    }
-    if(p100-p010) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y+one,z);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet2 += nvert;
-      count++;
-      if(!p100){px=x+one;py=y;pz=z;}
-      else{px=x;py=y+one;pz=z;}
-    }
-    if(p010-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet2 += nvert;
-      count++;
-      if(!p010){px=x;py=y+one;pz=z;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(count >= 3) {
-      auto triangle21 = make_unique<Triangle>(tet2[0],tet2[1],tet2[2]);
-      for (int i=0; i<3; i++){
-        tet2[i]->addNeighbour(&*triangle21);
+          { triangles.Append(std::move(triangle2)); }
+        }
+        for(auto i : Range(count))
+          {
+            auto vert = tet[i];
+            size_t cluster = 0;
+            bool has_neighbour_in_cluster = true;
+            while(has_neighbour_in_cluster)
+              {
+                has_neighbour_in_cluster = false;
+                for(auto trig : vert->neighbours)
+                  for(auto other : {trig->v1, trig->v2, trig->v3})
+                    if(other->cluster==cluster)
+                      {
+                        has_neighbour_in_cluster = true;
+                        cluster++;
+                      }
+              }
+            SPDLOG_DEBUG(log, "Vertex changed to cluster " + to_string(cluster));
+            vert->cluster = cluster;
+          }
       }
-#pragma omp critical(triangles)
-      triangles.Append(move(triangle21));
-    }
-    if(count==4){
-      auto triangle22 = make_unique<Triangle>(tet2[1],tet2[2],tet2[3]);
-      for (int i=1; i<4; i++){
-        tet2[i]->addNeighbour(&*triangle22);
-      }
-#pragma omp critical(triangles)
-      triangles.Append(move(triangle22));
-    }
-    // third tetraeder
-    Array<Vertex*> tet3;
-    count = 0;
-    if(p100-p001) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet3 += nvert;
-      count++;
-      if(!p100){px=x+one;py=y;pz=z;}
-      else{px=x;py=y;pz=z+one;}
-    }
-    if(p100-p101) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x+one,y,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet3 += nvert;
-      count++;
-      if(!p100){px=x+one;py=y;pz=z;}
-      else{px=x+one;py=y;pz=z+one;}
-    }
-    if(p001-p101) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x+one,y,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet3 += nvert;
-      count++;
-      if(!p001){px=x;py=y;pz=z+one;}
-      else{px=x+one;py=y;pz=z+one;}
-    }
-    if(p100-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet3 += nvert;
-      count++;
-      if(!p100){px=x+one;py=y;pz=z;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(p001-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet3 += nvert;
-      count++;
-      if(!p001){px=x;py=y;pz=z+one;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(p101-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z+one,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet3 += nvert;
-      count++;
-      if(!p101){px=x+one;py=y;pz=z+one;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(count >= 3) {
-      auto triangle31 = make_unique<Triangle>(tet3[0],tet3[1],tet3[2]);
-      for (int i=0; i<3; i++){
-        tet3[i]->addNeighbour(&*triangle31);
-      }
-#pragma omp critical(triangles)      
-      triangles.Append(move(triangle31));
-    }
-    if(count==4){
-      auto triangle32 = make_unique<Triangle>(tet3[1],tet3[2],tet3[3]);
-      for (int i=1; i<4; i++){
-        tet3[i]->addNeighbour(&*triangle32);
-      }
-#pragma omp critical(triangles)
-      triangles.Append(move(triangle32));
-    }
-
-    // fourth tetraeder
-    Array<Vertex*> tet4;
-    count = 0;
-    if(p001-p010) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x,y+one,z);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet4 += nvert;
-      count++;
-      if(!p001){px=x;py=y;pz=z+one;}
-      else{px=x;py=y+one;pz=z;}
-    }
-    if(p001-p011) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet4 += nvert;
-      count++;
-      if(!p001){px=x;py=y;pz=z+one;}
-      else{px=x;py=y+one;pz=z+one;}
-    }
-    if(p010-p011) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet4 += nvert;
-      count++;
-      if(!p010){px=x;py=y+one;pz=z;}
-      else{px=x;py=y+one;pz=z+one;}
-    }
-    if(p001-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet4 += nvert;
-      count++;
-      if(!p001){px=x;py=y;pz=z+one;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(p010-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet4 += nvert;
-      count++;
-      if(!p010){px=x;py=y+one;pz=z;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(p011-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z+one,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet4 += nvert;
-      count++;
-      if(!p011){px=x;py=y+one;pz=z+one;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(count >= 3) {
-      auto triangle41 = make_unique<Triangle>(tet4[0],tet4[1],tet4[2]);
-      for (int i=0; i<3; i++){
-        tet4[i]->addNeighbour(&*triangle41);
-      }
-#pragma omp critical(triangles)
-      triangles.Append(move(triangle41));
-    }
-    if(count==4){
-      auto triangle42 = make_unique<Triangle>(tet4[1],tet4[2],tet4[3]);
-      for (int i=1; i<4; i++){
-        tet4[i]->addNeighbour(&*triangle42);
-      }
-#pragma omp critical(triangles)
-      triangles.Append(move(triangle42));
-    }
-    // fifth tetraeder
-    Array<Vertex*> tet5;
-    count = 0;
-    if(p100-p001) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet5 += nvert;
-      count++;
-      if(!p100){px=x+one;py=y;pz=z;}
-      else{px=x;py=y;pz=z+one;}
-    }
-    if(p100-p010) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x,y+one,z);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet5 += nvert;
-      count++;
-      if(!p100){px=x+one;py=y;pz=z;}
-      else{px=x;py=y+one;pz=z;}
-    }
-    if(p010-p001) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x,y,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet5 += nvert;
-      count++;
-      if(!p010){px=x;py=y+one;pz=z;}
-      else{px=x;py=y;pz=z+one;}
-    }
-    if(p100-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x+one,y,z,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet5 += nvert;
-      count++;
-      if(!p100){px=x+one;py=y;pz=z;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(p001-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y,z+one,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet5 += nvert;
-      count++;
-      if(!p001){px=x;py=y;pz=z+one;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(p010-p111) {
-      auto nvert = MakeVertex(local_vertices, thread_vertices,x,y+one,z,x+one,y+one,z+one);
-      assert(nvert);
-      local_vertices.Append(nvert);
-      tet5 += nvert;
-      count++;
-      if(!p010){px=x;py=y+one;pz=z;}
-      else{px=x+one;py=y+one;pz=z+one;}
-    }
-    if(count >= 3) {
-      auto triangle51 = make_unique<Triangle>(tet5[0],tet5[1],tet5[2]);
-      for (int i=0; i<3; i++){
-        tet5[i]->addNeighbour(&*triangle51);
-      }
-#pragma omp critical(triangles)
-      triangles.Append(move(triangle51));
-    }
-    if(count==4){
-      auto triangle52 = make_unique<Triangle>(tet5[1],tet5[2],tet5[3]);
-      for (int i=1; i<4; i++){
-        tet5[i]->addNeighbour(&*triangle52);
-      }
-#pragma omp critical(triangles)
-      triangles.Append(move(triangle52));
-    }
   }
-
   // create new vertex and store unique_ptr to it in vertices, put pointer in openVertices and return
   // pointer to that new vertex
   
   VoxelSTLGeometry::Vertex* VoxelSTLGeometry ::
-  MakeVertex(Array<Vertex*>& local_vertices,
-             Array<unique_ptr<Vertex>>& thread_vertices,
+  MakeVertex(Array<unique_ptr<Vertex>>& thread_vertices,
              size_t x1, size_t y1, size_t z1, size_t x2, size_t y2, size_t z2)
   {
     if (isUsedVoxel(x1,y1,z1)) {
@@ -835,47 +518,11 @@ namespace voxel2stl
 
     Vec<3,double> x(x1,y1,z1);
     Vec<3,double> y(x2,y2,z2);
-    for (auto vert : local_vertices)
-      if (vert->doIhave(x,y))
-        {
-          SPDLOG_DEBUG(log, "Vertex " + vert->to_string() + " found in local vertices");
-          size_t cluster = 0;
-          bool has_neighbour_in_cluster = true;
-          while(has_neighbour_in_cluster)
-            {
-              has_neighbour_in_cluster = false;
-              for(auto trig : vert->neighbours)
-                for(auto other : {trig->v1, trig->v2, trig->v3})
-                  if(other->cluster==cluster)
-                    {
-                      has_neighbour_in_cluster = true;
-                      cluster++;
-                    }
-            }
-          SPDLOG_DEBUG(log, "Vertex changed to cluster " + to_string(cluster));
-          vert->cluster = cluster;
-          return vert;
-        }
     auto itV = voxel_to_vertex.find(make_tuple(x1,y1,z1,x2,y2,z2));
     if(itV != voxel_to_vertex.end())
       {
         auto vert = itV->second;
         SPDLOG_DEBUG(log, "Vertex " + vert->to_string() + " found in global vertices");
-        size_t cluster = 0;
-        bool has_neighbour_in_cluster = true;
-        while(has_neighbour_in_cluster)
-          {
-            has_neighbour_in_cluster = false;
-            for(auto trig : vert->neighbours)
-              for(auto other : {trig->v1, trig->v2, trig->v3})
-                if(other->cluster==cluster)
-                  {
-                    has_neighbour_in_cluster = true;
-                    cluster++;
-                  }
-          }
-          SPDLOG_DEBUG(log, "Vertex changed to cluster " + to_string(cluster));
-          vert->cluster = cluster;
         return vert;
       }
 
