@@ -489,7 +489,9 @@ namespace voxel2stl
     auto newVertex = make_unique<Vertex>(x,y);
     auto nvert = &*newVertex;
     nvert->cluster = 0;
+#pragma omp critical(voxel_to_vertex)
     voxel_to_vertex[make_tuple(x1,y1,z1,x2,y2,z2)] = nvert;
+
     SPDLOG_DEBUG(log, "Created new vertex " + nvert->to_string());
     thread_vertices.Append(move(newVertex));
     return nvert;
