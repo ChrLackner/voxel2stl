@@ -32,7 +32,7 @@ namespace voxel2stl
     log->flush();
     is.close();
     auto nx_old = nx;
-    while (! (nx%num_threads))
+    while (nx%num_threads)
       nx++;
     data.SetSize(nx*ny*nz);
 #pragma omp parallel for
