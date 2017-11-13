@@ -31,18 +31,11 @@ namespace voxel2stl
       log->error("Error in reading of voxel data from file " + filename);
     log->flush();
     is.close();
-    auto nx_old = nx;
-    while (nx%num_threads)
-      nx++;
     data.SetSize(nx*ny*nz);
 #pragma omp parallel for
-    for(size_t i = 0; i < nx_old*ny*nz; i++)
+    for(size_t i = 0; i < nx*ny*nz; i++)
       data[i] = (double) buffer[i];
 
-    // fill up for parallel computation
-#pragma omp parallel for
-    for(size_t i = nx_old*ny*nz; i<nx*ny*nz; i++)
-      data[i] = 0;
     free(buffer);
   }
 
