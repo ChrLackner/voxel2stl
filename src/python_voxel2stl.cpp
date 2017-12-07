@@ -57,10 +57,18 @@ void ExportVoxel2STL(py::module & m)
            new (instance) VoxelSTLGeometry(data,materials,boundaries,log);
          }, py::arg("voxeldata"), py::arg("materials")=nullptr, py::arg("boundaries")=nullptr,
          py::arg("logger") = make_shared<spdlog::logger>("VoxelSTLGeometry", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
-    .def("ApplySmoothingStep", &VoxelSTLGeometry::ApplySmoothingStep,
-         py::arg("subdivision"),py::arg("weight_area")=0.1,py::arg("weight_minimum")=1.0)
+    .def("SubdivideTriangles", &VoxelSTLGeometry::SubdivideTriangles)
     .def("WriteSTL", &VoxelSTLGeometry::WriteSTL)
     // .def("WriteMeshsizeFile", &VoxelSTLGeometry::WriteMeshsizeFile)
+    ;
+
+  py::class_<FirstSmoother, shared_ptr<FirstSmoother>, pyspdlog::LoggedClass>
+    (m,"FirstSmoother", "First simple smoothing alg.")
+    .def (py::init<shared_ptr<VoxelSTLGeometry>,double,double,shared_ptr<spdlog::logger>>(),
+          py::arg("geo"), py::arg("weight_area") = 0.1, py::arg("weight_minimum") = 1.,
+          py::arg("logger") = make_shared<spdlog::logger>
+          ("FirstSmoother", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
+    .def ("Apply", &FirstSmoother::Apply)
     ;
 }
 

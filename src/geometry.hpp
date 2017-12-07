@@ -3,6 +3,8 @@
 
 namespace voxel2stl
 {
+  class Smoother;
+
   class VoxelSTLGeometry : public pyspdlog::LoggedClass
   {
   private:
@@ -16,12 +18,13 @@ namespace voxel2stl
     Array<unique_ptr<Array<Vertex*>>> vertex_clustering;
     shared_ptr<Array<size_t>> materials, boundaries;
     std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*> voxel_to_vertex;
+    friend class FirstSmoother;
 
   public:
     VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<size_t>> amaterials, shared_ptr<Array<size_t>> aboundaries, shared_ptr<spdlog::logger> log);
 
-    void ApplySmoothingStep(bool subdivision, double weight_area, double weight_minimum);
     void WriteSTL(string filename);
+    void SubdivideTriangles();
 
   private:
     inline bool isUsedVoxel(size_t x, size_t y, size_t z)
@@ -40,8 +43,6 @@ namespace voxel2stl
     }
     void GenerateTrianglesAndVertices();
     void PartitionVertices();
-    void SubdivisionTriangles();
-    void MinimizeEnergy(double weight_area, double weight_minimum);
     void GenerateTVCube(size_t x, size_t y, size_t z,
                         Array<unique_ptr<Vertex>>& thread_vertices);
     Vertex* MakeVertex(Array<unique_ptr<Vertex>>& thread_vertices,

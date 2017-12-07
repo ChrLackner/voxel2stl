@@ -16,5 +16,6 @@ namespace voxel2stl{
 
 #include "voxeldata.hpp"
 #include "geometry.hpp"
+#include "smoother.hpp"
 
 #endif
