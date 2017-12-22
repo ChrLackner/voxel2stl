@@ -7,24 +7,27 @@ namespace voxel2stl
 
   class VoxelSTLGeometry : public pyspdlog::LoggedClass
   {
-  private:
+  public:
     struct Vertex;
     struct Triangle;
+  private:
+    using Tclustering = Array<unique_ptr<Array<Vertex*>>>;
     shared_ptr<VoxelData> data;
     Array<unique_ptr<Vertex>> vertices;
     Array<unique_ptr<Triangle>> triangles;
     double m;
     int num_threads;
-    Array<unique_ptr<Array<Vertex*>>> vertex_clustering;
+    Tclustering vertex_clustering;
     shared_ptr<Array<size_t>> materials, boundaries;
     std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*> voxel_to_vertex;
-    friend class FirstSmoother;
 
   public:
     VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<size_t>> amaterials, shared_ptr<Array<size_t>> aboundaries, shared_ptr<spdlog::logger> log);
 
     void WriteSTL(string filename);
     void SubdivideTriangles();
+
+    auto& GetVertexClustering() const { return vertex_clustering; }
 
   private:
     inline bool isUsedVoxel(size_t x, size_t y, size_t z)
@@ -48,6 +51,7 @@ namespace voxel2stl
     Vertex* MakeVertex(Array<unique_ptr<Vertex>>& thread_vertices,
                        size_t x1, size_t y1, size_t z1, size_t x2, size_t y2, size_t z2);
 
+  public:
     struct Vertex{
       //int x1,y1,z1;
       Vec<3,double> x; //INNER POINT
@@ -69,6 +73,8 @@ namespace voxel2stl
         SetRatio(0.5*(v1->ratio+v2->ratio));
       }
       Vertex() { ; }
+      Vertex(const Vertex&) = delete;
+
       inline bool doIhave(Vec<3,double> &x, Vec<3,double> &y) {
         return ((x==this->x && y==this->y) || (x==this->y && y==this->x)); }
 
@@ -135,6 +141,8 @@ namespace voxel2stl
       {
 	this->UpdateNormal();
       }
+
+      Triangle(const Triangle&) = delete;
 
       inline void UpdateNormal()
       {
@@ -207,9 +215,6 @@ namespace voxel2stl
     };
 
   };
-
-  double Newton(std::function<double (double)>  func, double r0, double &energydifference, double & energy);
-
 
 }
 

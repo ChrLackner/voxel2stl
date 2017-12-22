@@ -57,7 +57,12 @@ def test_stairs():
     data = VoxelData("voxel_stairs.raw", 20,10,20, 1, log=logger)
     geo = VoxelSTLGeometry(data,logger=logger)
     smoother = FirstSmoother(geo,logger=logger)
+    for i in range(3):
+        smoother.Apply()
     for i in range(5):
+        geo.SubdivideTriangles()
+        smoother.Apply()
+    for i in range(2):
         smoother.Apply()
     geo.WriteSTL("stairs.stl")
     stl_mesh = stl.mesh.Mesh.from_file("stairs.stl")

@@ -6,8 +6,8 @@
 namespace voxel2stl
 {
 
-  double Smoother :: Newton(std::function<double (double)>  func,
-                            double r0, double &energydifference, double & energy){
+  double NewtonSmoother :: Newton(std::function<double (double)>  func,
+                                  double r0, double &energydifference, double & energy){
 	double r=r0;
 	energy = func(r0);
 	//newton method
@@ -51,12 +51,13 @@ namespace voxel2stl
     }
     double e = 0; double e_diff = 0;
     log->info("Minimize energy with " + std::to_string(num_threads) + " threads");
-    for (size_t cluster = 0; cluster<geo->vertex_clustering.Size(); cluster++)
+    auto& vertex_clustering = geo->GetVertexClustering();
+    for (size_t cluster = 0; cluster<vertex_clustering.Size(); cluster++)
       {
 #pragma omp parallel for
-        for (size_t i = 0; i < geo->vertex_clustering[cluster]->Size();i++)
+        for (size_t i = 0; i < vertex_clustering[cluster]->Size();i++)
           {
-            auto vertex = (*geo->vertex_clustering[cluster])[i];
+            auto vertex = (*vertex_clustering[cluster])[i];
             double energy_difference = 0;
             double energy = 0;
             energy = 0;
