@@ -3,6 +3,7 @@
 
 
 #include <map>
+#include <set>
 #include <fstream>
 #include <ngs_core.hpp>
 #include "pyspdlog.hpp"

@@ -28,20 +28,27 @@ def test_small():
                 (10,10,10))
     data = VoxelData("voxel_small.raw", 10,10,10, 1, log=logger)
     geo = VoxelSTLGeometry(data,logger=logger)
-    # geo.ApplySmoothingStep(False)
+    smoother = FirstSmoother(geo,logger=logger)
+    for i in range(10):
+        smoother.Apply()
+    # for i in range(3):
+    #     smoother.Apply()
     geo.WriteSTL("small.stl")
     stl_mesh = stl.mesh.Mesh.from_file("small.stl")
     if __name__ == "__main__":
-        figure = pyplot.figure()
-        axes = mplot3d.Axes3D(figure)
-        axes.add_collection3d(mplot3d.art3d.Poly3DCollection(stl_mesh.vectors))
-        scale = stl_mesh.points.flatten(-1)
-        axes.auto_scale_xyz(scale,scale,scale)
-        pyplot.show()
-    volume, cog, inertia = stl_mesh.get_mass_properties()
-    print("Volume: ", volume)
-    print("Cog: ", cog)
-    print("Inertia: ", inertia)
+        import subprocess
+        subprocess.call(['/home/clackner/gitlab/install/netgen/bin/netgen','small.stl'])
+    # if __name__ == "__main__":
+    #     figure = pyplot.figure()
+    #     axes = mplot3d.Axes3D(figure)
+    #     axes.add_collection3d(mplot3d.art3d.Poly3DCollection(stl_mesh.vectors))
+    #     scale = stl_mesh.points.flatten(-1)
+    #     axes.auto_scale_xyz(scale,scale,scale)
+    #     pyplot.show()
+    # volume, cog, inertia = stl_mesh.get_mass_properties()
+    # print("Volume: ", volume)
+    # print("Cog: ", cog)
+    # print("Inertia: ", inertia)
 
 def test_stairs():
     sinkfile = simple_file_sink("debug_stairs.out",True)
@@ -56,14 +63,15 @@ def test_stairs():
                 (20,10,20))
     data = VoxelData("voxel_stairs.raw", 20,10,20, 1, log=logger)
     geo = VoxelSTLGeometry(data,logger=logger)
-    smoother = FirstSmoother(geo,logger=logger)
+    smoother2 = FirstSmoother(geo,logger=logger)
+    smoother = SimpleSmoother(geo,logger=logger)
     for i in range(3):
         smoother.Apply()
-    for i in range(5):
+    for i in range(10):
         geo.SubdivideTriangles()
-        smoother.Apply()
-    for i in range(2):
-        smoother.Apply()
+        smoother2.Apply()
+    for i in range(4):
+        smoother2.Apply()
     geo.WriteSTL("stairs.stl")
     stl_mesh = stl.mesh.Mesh.from_file("stairs.stl")
     CreateThreadLogFiles("debug_stairs.out")

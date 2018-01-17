@@ -104,6 +104,25 @@ namespace voxel2stl
         throw Exception("Wanted to delete non existing neighbor!");
       }
 
+      inline void FindFreeCluster()
+      {
+        auto cluster_free = [&](size_t cluster)
+          {
+            for (auto trig : neighbours)
+              for(auto other : {trig->OtherVertices(this,1), trig->OtherVertices(this,2)})
+                for (auto othertrig : other->neighbours)
+                  for (auto vert : {othertrig->v1, othertrig->v2, othertrig->v3})
+                    if(vert != this && vert->cluster == cluster)
+                      return false;
+            return true;
+          };
+        size_t clus = 0;
+        while (!cluster_free(clus))
+          clus++;
+        SPDLOG_DEBUG(log, "Vertex " + this->to_string() + " changed to cluster " + to_string(cluster));
+        this->cluster = clus;
+      }
+
       inline string to_string() {
         return "(" + std::to_string(x[0]) + "," + std::to_string(x[1]) + "," +
           std::to_string(x[2]) + ") -> (" + std::to_string(y[0]) + "," +

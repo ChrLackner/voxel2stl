@@ -76,19 +76,19 @@ namespace voxel2stl
                to_string(data->Getnz()));
 
     size_t sum_size = 0;
+    int count = 0;
     for(auto ixiy : {true,false})
       {
         for(auto ixiz : {true,false})
           {
 #pragma omp parallel for
             for (size_t ix=0; ix<data->Getnx()-1; ix++)
-              {
-                for (size_t iy=0; iy<data->Getny()-1;iy++)
-                  for (size_t iz = 0; iz < data->Getnz()-1; iz++)
-                    if((ix+iy)%2==ixiy)
-                      if((ix+iz)%2==ixiz)
-                        GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
-              }
+              for (size_t iy=0; iy<data->Getny()-1;iy++)
+                for (size_t iz = 0; iz < data->Getnz()-1; iz++)
+                  if((ix+iy)%2==ixiy)
+                    if((ix+iz)%2==ixiz)
+                      GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
+
             for(auto i : Range(num_threads))
               sum_size += thread_vertices[i].Size();
             vertices.SetAllocSize(sum_size);
@@ -98,7 +98,8 @@ namespace voxel2stl
                   vertices.Append(move(thread_vertices[i][j]));
                 thread_vertices[i].SetSize(0);
               }
-            log->debug("Num vertices created after first round = " + std::to_string(sum_size));
+            log->debug("Num vertices created after " + std::to_string(++count) +
+                       " round = " + std::to_string(sum_size));
           }
       }
   }
@@ -121,9 +122,8 @@ namespace voxel2stl
       vertex_clustering[i]->SetAllocSize(cluster_count[i]);
 
     for (auto& vert : vertices)
-      {
-        vertex_clustering[vert->cluster]->Append(&*vert);
-      }
+      vertex_clustering[vert->cluster]->Append(&*vert);
+
     log->debug("Using " + std::to_string(vertex_clustering.Size()) + " clusters for the vertices");
     log->debug("In total there are " + std::to_string(vertices.Size()) + " vertices");
     log->debug(" and " + std::to_string(triangles.Size()) + " triangles.");
@@ -224,23 +224,7 @@ namespace voxel2stl
           }
         }
         for (auto vert : vertex)
-          {
-            size_t cluster = 0;
-            bool has_neighbour_in_cluster = true;
-            while(has_neighbour_in_cluster)
-              {
-                has_neighbour_in_cluster = false;
-                for(auto trig : vert->neighbours)
-                  for(auto other : {trig->v1, trig->v2, trig->v3})
-                    if(other->cluster==cluster)
-                      {
-                        has_neighbour_in_cluster = true;
-                        cluster++;
-                      }
-              }
-            SPDLOG_DEBUG(log, "Vertex changed to cluster " + to_string(cluster));
-            vert->cluster = cluster;
-          }
+          vert->FindFreeCluster();
       }
     }
     for (size_t j=0; j<trianglesOriginalSize; j++)
@@ -295,7 +279,8 @@ namespace voxel2stl
                                            {{4,1},{4,2},{2,1},{4,7},{1,7},{2,7}}};
     for(auto& tets : combinations)
       {
-        Array<Vertex*> tet;
+        Array<Vertex*> tet(4);
+        tet.SetSize0();
         size_t count = 0;
         for(auto& i : tets)
           {
@@ -330,39 +315,7 @@ namespace voxel2stl
         for(auto i : Range(count))
           {
             auto vert = tet[i];
-            size_t cluster = 0;
-            bool has_neighbour_in_cluster = true;
-            auto check_neighbour_in_cluster = [](auto vert, auto cluster)
-              {
-                for(auto trig : vert->neighbours)
-                  for(auto other : {trig->v1, trig->v2, trig->v3})
-                    // if(other!=vert && other->cluster==cluster)
-                    //   {
-                    //     has_neighbour_in_cluster = true;
-                    //     cluster++;
-                    //   }
-                // larger vertex patch:
-                    if (other!=vert)
-                      {
-                        for (auto othertrig : other->neighbours)
-                          {
-                            for (auto vpatch : {othertrig->v1, othertrig->v2, othertrig->v3})
-                              {
-                                if(vpatch!=vert && vpatch->cluster==cluster)
-                                  {
-                                    return true;
-                                  }
-                              }
-                          }
-                      }
-                return false;
-              };
-            while(check_neighbour_in_cluster(vert,cluster))
-              {
-                cluster++;
-              }
-            SPDLOG_DEBUG(log, "Vertex changed to cluster " + to_string(cluster));
-            vert->cluster = cluster;
+            vert->FindFreeCluster();
           }
       }
   }

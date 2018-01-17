@@ -62,14 +62,24 @@ void ExportVoxel2STL(py::module & m)
     // .def("WriteMeshsizeFile", &VoxelSTLGeometry::WriteMeshsizeFile)
     ;
 
-  py::class_<FirstSmoother, shared_ptr<FirstSmoother>, pyspdlog::LoggedClass>
-    (m,"FirstSmoother", "First simple smoothing alg.")
-    .def (py::init<shared_ptr<VoxelSTLGeometry>,double,double,shared_ptr<spdlog::logger>>(),
-          py::arg("geo"), py::arg("weight_area") = 0.1, py::arg("weight_minimum") = 1.,
-          py::arg("logger") = make_shared<spdlog::logger>
-          ("FirstSmoother", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
-    .def ("Apply", &FirstSmoother::Apply)
+  py::class_<Smoother, shared_ptr<Smoother>, pyspdlog::LoggedClass>
+    (m,"Smoother", "Base class for smoothers")
+    .def("Apply", &Smoother::Apply)
     ;
+
+  py::class_<NewtonSmoother<FirstEnergy>, shared_ptr<NewtonSmoother<FirstEnergy>>, Smoother>
+    (m,"FirstSmoother", "First simple smoothing alg.")
+    .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
+          py::arg("geo"), py::arg("logger") = make_shared<spdlog::logger>
+          ("FirstSmoother", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
+    ;
+  py::class_<NewtonSmoother<SimpleEnergy>, shared_ptr<NewtonSmoother<SimpleEnergy>>, Smoother>
+    (m,"SimpleSmoother", "First simple smoothing alg.")
+    .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
+          py::arg("geo"), py::arg("logger") = make_shared<spdlog::logger>
+          ("SimpleSmoother", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
+    ;
+
 }
 
 
