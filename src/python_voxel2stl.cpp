@@ -2,6 +2,7 @@
 #include "voxel2stl.hpp"
 #include <stdio.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 
 using namespace voxel2stl;
 namespace py = pybind11;
@@ -29,6 +30,25 @@ void ExportVoxel2STL(py::module & m)
            self->WriteMaterials(filename,region);
          },
          "Write the material number of each voxel restricted to the with it's coordinates to an output file")
+    .def_property_readonly("dims", [] (VoxelData& self)
+                           {
+                             return py::make_tuple(self.Getnx(),
+                                                   self.Getny(),
+                                                   self.Getnz());
+                           })
+    .def_property_readonly("voxelsize", &VoxelData::Getm)
+    .def("GetBoundingBox", [](VoxelData& self)
+         {
+           return py::make_tuple(py::make_tuple(0,0,0),py::make_tuple(self.Getnx() * self.Getm(),
+                                                                      self.Getny() * self.Getm(),
+                                                                      self.Getnz() * self.Getm()));
+         })
+    .def_property_readonly("data", [](VoxelData& self)
+                           {
+                             return py::array_t<unsigned char>(self.GetData().Size(),
+                                                               &self.GetData()[0],
+                                                               nullptr);
+                           }, py::return_value_policy::reference_internal)
     ;
 
   py::class_<VoxelSTLGeometry, shared_ptr<VoxelSTLGeometry>, pyspdlog::LoggedClass>

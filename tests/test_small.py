@@ -15,6 +15,35 @@ def CreateVoxel(filename,indicator_function,dimensions):
     with open(filename,"wb") as file:
         file.write(pack(str(dimensions[0]*dimensions[1]*dimensions[2])+'B',*l))
 
+def test_stairs():
+    sinkfile = simple_file_sink("debug_stairs.out",True)
+    sinkconsole = console_sink(True)
+    logger = Logger("Geometry",[sinkfile,sinkconsole])
+    logger.SetLevel(LOGGING_LEVEL.DEBUG)
+    logger.SetPattern("%t %+")
+    sinkconsole.SetLevel(LOGGING_LEVEL.INFO)
+    sinkfile.SetLevel(LOGGING_LEVEL.DEBUG)
+    CreateVoxel("stairs.raw",
+                lambda x,y,z: int(x*3<z) * int(x>2) * int(x<28) * int(y>2) * int(y<18)* int(z>2) * int(z<28),
+                (30,20,30))
+    data = VoxelData("stairs.raw", 30,20,30, 1, log=logger)
+    geo = VoxelSTLGeometry(data,logger=logger)
+    geo.ApplySmoothingStep(False)
+    geo.ApplySmoothingStep(False)
+    # for i in range(6):
+    #     geo.ApplySmoothingStep(True)
+    geo.ApplySmoothingStep(False)
+    geo.ApplySmoothingStep(False)
+    geo.WriteSTL("stairs.stl")
+    stl_mesh = stl.mesh.Mesh.from_file("stairs.stl")
+    if __name__ == "__main__":
+        figure = pyplot.figure()
+        axes = mplot3d.Axes3D(figure)
+        axes.add_collection3d(mplot3d.art3d.Poly3DCollection(stl_mesh.vectors))
+        scale = stl_mesh.points.flatten(-1)
+        axes.auto_scale_xyz(scale,scale,scale)
+        pyplot.show()
+
 def test_small():
     sinkfile = simple_file_sink("debug.out",True)
     sinkconsole = console_sink(True)
@@ -28,6 +57,11 @@ def test_small():
                 (10,10,10))
     data = VoxelData("voxel_small.raw", 10,10,10, 1, log=logger)
     geo = VoxelSTLGeometry(data,logger=logger)
+    # geo.ApplySmoothingStep(False)
+    # geo.ApplySmoothingStep(False)
+    # for i in range(6):
+    #     geo.ApplySmoothingStep(True)
+    # geo.ApplySmoothingStep(False)
     # geo.ApplySmoothingStep(False)
     geo.WriteSTL("small.stl")
     stl_mesh = stl.mesh.Mesh.from_file("small.stl")
@@ -44,4 +78,5 @@ def test_small():
     print("Inertia: ", inertia)
 
 if __name__ == "__main__":
-    test_small()
+    # test_small()
+    test_stairs()

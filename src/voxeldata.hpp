@@ -6,7 +6,7 @@ namespace voxel2stl
   class VoxelData : public pyspdlog::LoggedClass
   {
   private:
-    Array<double> data;
+    Array<unsigned char> data;
     size_t nx,ny,nz;
     double m;
   
@@ -17,11 +17,13 @@ namespace voxel2stl
     void WriteMaterials(const string & filename) const;
     void WriteMaterials(const string & filename, const Array<size_t>& region) const;
 
-    double operator()(size_t i, size_t j, size_t k) const { return data[i+nx*(j+ny*k)]; }
+    int operator()(size_t i, size_t j, size_t k) const { return data[i+nx*(j+ny*k)]; }
     double Getm()  const  { return m; }
     size_t Getnx() const { return nx; }
     size_t Getny() const { return ny; }
     size_t Getnz() const { return nz; }
+
+    Array<unsigned char>& GetData() { return data; }
   };
 }
 
