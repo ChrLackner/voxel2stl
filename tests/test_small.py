@@ -77,6 +77,36 @@ def test_small():
     print("Cog: ", cog)
     print("Inertia: ", inertia)
 
+def test_stairs():
+    sinkfile = simple_file_sink("debug_stairs.out",True)
+    sinkconsole = console_sink(True)
+    logger = Logger("Geometry",[sinkfile,sinkconsole])
+    logger.SetLevel(LOGGING_LEVEL.DEBUG)
+    logger.SetPattern("%t %+")
+    sinkconsole.SetLevel(LOGGING_LEVEL.INFO)
+    sinkfile.SetLevel(LOGGING_LEVEL.DEBUG)
+    CreateVoxel("voxel_stairs.raw",
+                lambda x,y,z: int(x>1) * int(x<18) * int(y>1) * int(y<9) * int(z>1) * int(z<18) * int(3*x<z),
+                (20,10,20))
+    data = VoxelData("voxel_stairs.raw", 20,10,20, 1, log=logger)
+    geo = VoxelSTLGeometry(data,logger=logger)
+    # for i in range(5):
+    #     geo.ApplySmoothingStep(False)
+    geo.WriteSTL("stairs.stl")
+    stl_mesh = stl.mesh.Mesh.from_file("stairs.stl")
+    CreateThreadLogFiles("debug_stairs.out")
+    if __name__ == "__main__":
+        import subprocess
+        subprocess.call(['/home/clackner/gitlab/install/netgen/bin/netgen','stairs.stl'])
+    # if __name__ == "__main__":
+    #     figure = pyplot.figure()
+    #     axes = mplot3d.Axes3D(figure)
+    #     axes.add_collection3d(mplot3d.art3d.Poly3DCollection(stl_mesh.vectors))
+    #     scale = stl_mesh.points.flatten(-1)
+    #     axes.auto_scale_xyz(scale,scale,scale)
+    #     pyplot.show()
+
+
 if __name__ == "__main__":
     # test_small()
     test_stairs()

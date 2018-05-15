@@ -1,1 +1,6 @@
 **/*~
+tests/*.out
+/tests/ng.ini
+tests/*.stl
+tests/*.raw
+tests/debug*

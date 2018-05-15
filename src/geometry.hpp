@@ -44,8 +44,7 @@ namespace voxel2stl
     void MinimizeEnergy(double weight_area, double weight_minimum);
     void GenerateTVCube(size_t x, size_t y, size_t z,
                         Array<unique_ptr<Vertex>>& thread_vertices);
-    Vertex* MakeVertex(Array<Vertex*>& local_vertices,
-                       Array<unique_ptr<Vertex>>& thread_vertices,
+    Vertex* MakeVertex(Array<unique_ptr<Vertex>>& thread_vertices,
                        size_t x1, size_t y1, size_t z1, size_t x2, size_t y2, size_t z2);
 
     struct Vertex{
@@ -200,6 +199,10 @@ namespace voxel2stl
       void MakeSubdivisionVertex(Array<Vertex*>& openVertices, Array<Vertex*>& vertex,
                                  Array<unique_ptr<Vertex>>& newVertices,
                                  std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*>& vox_to_vert);
+      inline string to_string()
+      {
+        return string("Trig \n") + v1->to_string() + "\n" + v2->to_string() + "\n" + v3->to_string();
+      }
     };
 
   };
