@@ -37,6 +37,11 @@ namespace voxel2stl
 #pragma omp parallel for
     for(size_t i = nx_old*ny*nz; i<nx*ny*nz; i++)
       data[i] = 0;
+
+    for(auto i : Range(nx*ny*nz))
+      if(data[i])
+        if(!material_names.count(data[i]))
+          material_names[data[i]] = "mat" + std::to_string(data[i]);
   }
 
   void VoxelData::WriteMaterials(const string & filename) const

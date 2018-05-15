@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 
 using namespace voxel2stl;
 namespace py = pybind11;
@@ -39,10 +40,16 @@ void ExportVoxel2STL(py::module & m)
     .def_property_readonly("voxelsize", &VoxelData::Getm)
     .def("GetBoundingBox", [](VoxelData& self)
          {
-           return py::make_tuple(py::make_tuple(0,0,0),py::make_tuple(self.Getnx() * self.Getm(),
-                                                                      self.Getny() * self.Getm(),
-                                                                      self.Getnz() * self.Getm()));
+           Vec<3> size = {self.Getnx() * self.Getm(),
+                               self.Getny() * self.Getm(),
+                               self.Getnz() * self.Getm()};
+           Vec<3> bot = - 0.5 * size;
+           Vec<3> top = 1.5 * size;
+           auto pybot = py::make_tuple(bot[0],bot[1],bot[2]);
+           auto pytop = py::make_tuple(top[0],top[1],top[2]);
+           return py::make_tuple(pybot, pytop);
          })
+    .def("GetMaterialNames", &VoxelData::GetMaterialNames)
     .def_property_readonly("data", [](VoxelData& self)
                            {
                              return py::array_t<unsigned char>(self.GetData().Size(),
