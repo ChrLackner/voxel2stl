@@ -5,9 +5,10 @@ namespace voxel2stl
 {
   class VoxelSTLGeometry : public pyspdlog::LoggedClass
   {
-  private:
+  public:
     struct Vertex;
     struct Triangle;
+  private:
     shared_ptr<VoxelData> data;
     Array<unique_ptr<Vertex>> vertices;
     Array<unique_ptr<Triangle>> triangles;
@@ -22,6 +23,15 @@ namespace voxel2stl
 
     void ApplySmoothingStep(bool subdivision, double weight_area, double weight_minimum);
     void WriteSTL(string filename);
+
+    size_t GetNVertices() const { return vertices.Size(); }
+    const Vertex& GetVertex(size_t index) const { return *vertices[index]; }
+
+    size_t GetNTriangles() const { return triangles.Size(); }
+    const Triangle& GetTriangle(size_t index) const  { return *triangles[index]; }
+    shared_ptr<Array<size_t>> GetBoundaries() { return boundaries; }
+    double GetVoxelSize() const { return m; }
+    shared_ptr<VoxelData> GetVoxelData() { return data; }
 
   private:
     inline bool isUsedVoxel(size_t x, size_t y, size_t z)
@@ -46,7 +56,7 @@ namespace voxel2stl
                         Array<unique_ptr<Vertex>>& thread_vertices);
     Vertex* MakeVertex(Array<unique_ptr<Vertex>>& thread_vertices,
                        size_t x1, size_t y1, size_t z1, size_t x2, size_t y2, size_t z2);
-
+  public:
     struct Vertex{
       //int x1,y1,z1;
       Vec<3,double> x; //INNER POINT

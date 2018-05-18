@@ -28,12 +28,12 @@ def test_stairs():
                 (30,20,30))
     data = VoxelData("stairs.raw", 30,20,30, 1, log=logger)
     geo = VoxelSTLGeometry(data,logger=logger)
-    geo.ApplySmoothingStep(False)
-    geo.ApplySmoothingStep(False)
-    # for i in range(6):
-    #     geo.ApplySmoothingStep(True)
-    geo.ApplySmoothingStep(False)
-    geo.ApplySmoothingStep(False)
+    # geo.ApplySmoothingStep(False)
+    # geo.ApplySmoothingStep(False)
+    # # for i in range(6):
+    # #     geo.ApplySmoothingStep(True)
+    # geo.ApplySmoothingStep(False)
+    # geo.ApplySmoothingStep(False)
     geo.WriteSTL("stairs.stl")
     stl_mesh = stl.mesh.Mesh.from_file("stairs.stl")
     if __name__ == "__main__":

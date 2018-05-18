@@ -8,6 +8,21 @@
 using namespace voxel2stl;
 namespace py = pybind11;
 
+
+template<typename T>
+py::object MoveToNumpyArray( ngstd::Array<T> &a )
+{
+  if(a.Size()) {
+      py::capsule free_when_done(&a[0], [](void *f) {
+                                 delete [] reinterpret_cast<T *>(f);
+                                 });
+      a.NothingToDelete();
+      return py::array_t<T>(a.Size(), &a[0], free_when_done);
+  }
+  else
+      return py::array_t<T>(0, nullptr);
+}
+
 void ExportVoxel2STL(py::module & m)
 {
   py::class_<VoxelData,shared_ptr<VoxelData>>
@@ -49,7 +64,15 @@ void ExportVoxel2STL(py::module & m)
            auto pytop = py::make_tuple(top[0],top[1],top[2]);
            return py::make_tuple(pybot, pytop);
          })
-    .def("GetMaterialNames", &VoxelData::GetMaterialNames)
+    .def("GetMaterialNames", &VoxelData::GetMaterialNames, py::return_value_policy::reference_internal)
+    .def("SetMaterialNames", [](VoxelData& self, py::list matnames)
+         {
+           for(auto i : Range(py::len(matnames)))
+             if(self.GetMaterialNames().count(i+1) == 0)
+               self.GetLogger()->warn("Material " + py::cast<string>(matnames[i]) + " not used!");
+           else
+             self.SetMaterialName((unsigned char) (i+1),py::cast<string>(matnames[i]));
+         })
     .def_property_readonly("data", [](VoxelData& self)
                            {
                              return py::array_t<unsigned char>(self.GetData().Size(),
@@ -59,7 +82,7 @@ void ExportVoxel2STL(py::module & m)
     ;
 
   py::class_<VoxelSTLGeometry, shared_ptr<VoxelSTLGeometry>, pyspdlog::LoggedClass>
-    (m,"VoxelSTLGeometry", "STLGeometry from voxel data")
+    (m,"VoxelSTLGeometry", "STLGeometry from voxel data", py::dynamic_attr())
     .def("__init__", [](VoxelSTLGeometry* instance, shared_ptr<VoxelData> data,
                         py::object mats, py::object bnds, shared_ptr<spdlog::logger> log)
          {
@@ -87,7 +110,51 @@ void ExportVoxel2STL(py::module & m)
     .def("ApplySmoothingStep", &VoxelSTLGeometry::ApplySmoothingStep,
          py::arg("subdivision"),py::arg("weight_area")=0.1,py::arg("weight_minimum")=1.0)
     .def("WriteSTL", &VoxelSTLGeometry::WriteSTL)
-    // .def("WriteMeshsizeFile", &VoxelSTLGeometry::WriteMeshsizeFile)
+    .def("GetData", [](VoxelSTLGeometry& self)
+         {
+           Array<float> verts;
+           verts.SetAllocSize(self.GetNTriangles()*9);
+           Array<unsigned int> trigs;
+           trigs.SetAllocSize(self.GetNTriangles()*4);
+           Array<float> normals;
+           normals.SetAllocSize(self.GetNTriangles()*9);
+           for(auto i : Range(self.GetNTriangles()))
+             {
+               const auto& trig = self.GetTriangle(i);
+               for(auto v : { trig.v1, trig.v2, trig.v3 })
+                 {
+                   for(auto j : Range(3))
+                     {
+                       verts.Append(v->xy[j]*self.GetVoxelSize());
+                       normals.Append(trig.n[j]);
+                     }
+                 }
+               for(auto j : Range(3))
+                 trigs.Append(i*3+j);
+               trigs.Append(0);
+             }
+           py::dict data;
+           data["vertices"] = MoveToNumpyArray(verts);
+           data["triangles"] = MoveToNumpyArray(trigs);
+           data["normals"] = MoveToNumpyArray(normals);
+           return data;
+         }, "data for visualization in new gui")
+    .def("GetBoundingBox", [](VoxelSTLGeometry& self)
+         {
+           Array<double> bounds;
+           if(self.GetBoundaries())
+             for (auto val : *self.GetBoundaries())
+               bounds.Append(self.GetVoxelSize() * val);
+           else
+             for(auto val : {self.GetVoxelData()->Getnx(),
+                   self.GetVoxelData()->Getny(),
+                   self.GetVoxelData()->Getnz()})
+               {
+                 bounds.Append(0);
+                 bounds.Append(val*self.GetVoxelSize());
+               }
+           return MoveToNumpyArray(bounds);
+         })
     ;
 }
 
