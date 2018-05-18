@@ -30,7 +30,7 @@ namespace voxel2stl
     auto& GetVertexClustering() const { return vertex_clustering; }
 
     size_t GetNVertices() const { return vertices.Size(); }
-    const Vertex& GetVertex(size_t index) const { return *vertices[index]; }
+    Vertex* GetVertex(size_t index) const { return vertices[index].get(); }
 
     size_t GetNTriangles() const { return triangles.Size(); }
     const Triangle& GetTriangle(size_t index) const  { return *triangles[index]; }

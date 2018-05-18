@@ -1,6 +1,8 @@
 # ifndef __FILE_SMOOTHER_HPP
 # define __FILE_SMOOTHER_HPP
 
+#include <omp.h>
+
 namespace voxel2stl
 {
   class Smoother : public pyspdlog::LoggedClass
@@ -12,6 +14,7 @@ namespace voxel2stl
       : geo(_geo), pyspdlog::LoggedClass(log) { ; }
 
     virtual void Apply() = 0;
+    virtual Array<float> CalcEnergy() const = 0;
   };
 
   template<typename E>
@@ -21,7 +24,40 @@ namespace voxel2stl
     NewtonSmoother(shared_ptr<VoxelSTLGeometry> geo, shared_ptr<spdlog::logger> log)
       : Smoother(geo,log) { ; }
 
-    virtual void Apply() override;
+    virtual void Apply() override
+    {
+      int num_threads;
+#pragma omp parallel
+      {
+        num_threads = omp_get_num_threads();
+      }
+      double e = 0; double e_diff = 0;
+      log->info("Minimize energy with " + std::to_string(num_threads) + " threads");
+      auto& vertex_clustering = geo->GetVertexClustering();
+      for (size_t cluster = 0; cluster<vertex_clustering.Size(); cluster++)
+        {
+          // #pragma omp parallel for
+          for (size_t i = 0; i < vertex_clustering[cluster]->Size();i++)
+            {
+              double energy, energydifference;
+              std::tie(energy,energydifference) = Newton((*vertex_clustering[cluster])[i]);
+              // #pragma omp critical (e)
+              {
+                e += energy;
+                e_diff += energydifference;
+              }
+              // vertex->SetRatio((1-weight_minimum)*vertex->ratio+(weight_minimum)*r);
+            }
+        }
+    }
+
+    Array<float> CalcEnergy() const override
+    {
+      Array<float> energy(geo->GetNVertices());
+      for (auto i : Range(geo->GetNVertices()))
+        energy[i] = E::Energy(geo->GetVertex(i));
+      return std::move(energy);
+    }
 
   protected:
     inline std::tuple<double,double> Newton(VoxelSTLGeometry::Vertex* vertex)
@@ -47,6 +83,8 @@ namespace voxel2stl
           vertex->SetRatio(vertex->ratio-2*h);
           double fm = E::Energy(vertex);
           vertex->SetRatio(vertex->ratio + h);
+          if(abs((fp-fm)/(2*h*f))<1e-10)
+            break;
           // w = h/2* (fp-fm) / (fp-2*f+fm);
           w = f / ((fp-fm) / (2*h));
           // cout << "w = " << w << endl;

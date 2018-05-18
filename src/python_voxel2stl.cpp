@@ -158,7 +158,15 @@ void ExportVoxel2STL(py::module & m)
 
   py::class_<Smoother, shared_ptr<Smoother>, pyspdlog::LoggedClass>
     (m,"Smoother", "Base class for smoothers")
-    .def("Apply", &Smoother::Apply)
+    .def("Apply", &Smoother::Apply,py::call_guard<py::gil_scoped_release>())
+    .def("CalcEnergy", [](Smoother& self)
+         {
+           auto energy = self.CalcEnergy();
+           {
+             py::gil_scoped_acquire ac;
+             return MoveToNumpyArray(energy);
+           }
+         },py::call_guard<py::gil_scoped_release>())
     ;
 
   py::class_<NewtonSmoother<FirstEnergy>, shared_ptr<NewtonSmoother<FirstEnergy>>, Smoother>
