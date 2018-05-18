@@ -2,9 +2,26 @@
 #include "voxel2stl.hpp"
 #include <stdio.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 
 using namespace voxel2stl;
 namespace py = pybind11;
+
+
+template<typename T>
+py::object MoveToNumpyArray( ngstd::Array<T> &a )
+{
+  if(a.Size()) {
+      py::capsule free_when_done(&a[0], [](void *f) {
+                                 delete [] reinterpret_cast<T *>(f);
+                                 });
+      a.NothingToDelete();
+      return py::array_t<T>(a.Size(), &a[0], free_when_done);
+  }
+  else
+      return py::array_t<T>(0, nullptr);
+}
 
 void ExportVoxel2STL(py::module & m)
 {
@@ -29,10 +46,43 @@ void ExportVoxel2STL(py::module & m)
            self->WriteMaterials(filename,region);
          },
          "Write the material number of each voxel restricted to the with it's coordinates to an output file")
+    .def_property_readonly("dims", [] (VoxelData& self)
+                           {
+                             return py::make_tuple(self.Getnx(),
+                                                   self.Getny(),
+                                                   self.Getnz());
+                           })
+    .def_property_readonly("voxelsize", &VoxelData::Getm)
+    .def("GetBoundingBox", [](VoxelData& self)
+         {
+           Vec<3> size = {self.Getnx() * self.Getm(),
+                               self.Getny() * self.Getm(),
+                               self.Getnz() * self.Getm()};
+           Vec<3> bot = - 0.5 * size;
+           Vec<3> top = 1.5 * size;
+           auto pybot = py::make_tuple(bot[0],bot[1],bot[2]);
+           auto pytop = py::make_tuple(top[0],top[1],top[2]);
+           return py::make_tuple(pybot, pytop);
+         })
+    .def("GetMaterialNames", &VoxelData::GetMaterialNames, py::return_value_policy::reference_internal)
+    .def("SetMaterialNames", [](VoxelData& self, py::list matnames)
+         {
+           for(auto i : Range(py::len(matnames)))
+             if(self.GetMaterialNames().count(i+1) == 0)
+               self.GetLogger()->warn("Material " + py::cast<string>(matnames[i]) + " not used!");
+           else
+             self.SetMaterialName((unsigned char) (i+1),py::cast<string>(matnames[i]));
+         })
+    .def_property_readonly("data", [](VoxelData& self)
+                           {
+                             return py::array_t<unsigned char>(self.GetData().Size(),
+                                                               &self.GetData()[0],
+                                                               nullptr);
+                           }, py::return_value_policy::reference_internal)
     ;
 
   py::class_<VoxelSTLGeometry, shared_ptr<VoxelSTLGeometry>, pyspdlog::LoggedClass>
-    (m,"VoxelSTLGeometry", "STLGeometry from voxel data")
+    (m,"VoxelSTLGeometry", "STLGeometry from voxel data", py::dynamic_attr())
     .def("__init__", [](VoxelSTLGeometry* instance, shared_ptr<VoxelData> data,
                         py::object mats, py::object bnds, shared_ptr<spdlog::logger> log)
          {
@@ -59,7 +109,51 @@ void ExportVoxel2STL(py::module & m)
          py::arg("logger") = make_shared<spdlog::logger>("VoxelSTLGeometry", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
     .def("SubdivideTriangles", &VoxelSTLGeometry::SubdivideTriangles)
     .def("WriteSTL", &VoxelSTLGeometry::WriteSTL)
-    // .def("WriteMeshsizeFile", &VoxelSTLGeometry::WriteMeshsizeFile)
+    .def("GetData", [](VoxelSTLGeometry& self)
+         {
+           Array<float> verts;
+           verts.SetAllocSize(self.GetNTriangles()*9);
+           Array<unsigned int> trigs;
+           trigs.SetAllocSize(self.GetNTriangles()*4);
+           Array<float> normals;
+           normals.SetAllocSize(self.GetNTriangles()*9);
+           for(auto i : Range(self.GetNTriangles()))
+             {
+               const auto& trig = self.GetTriangle(i);
+               for(auto v : { trig.v1, trig.v2, trig.v3 })
+                 {
+                   for(auto j : Range(3))
+                     {
+                       verts.Append(v->xy[j]*self.GetVoxelSize());
+                       normals.Append(trig.n[j]);
+                     }
+                 }
+               for(auto j : Range(3))
+                 trigs.Append(i*3+j);
+               trigs.Append(0);
+             }
+           py::dict data;
+           data["vertices"] = MoveToNumpyArray(verts);
+           data["triangles"] = MoveToNumpyArray(trigs);
+           data["normals"] = MoveToNumpyArray(normals);
+           return data;
+         }, "data for visualization in new gui")
+    .def("GetBoundingBox", [](VoxelSTLGeometry& self)
+         {
+           Array<double> bounds;
+           if(self.GetBoundaries())
+             for (auto val : *self.GetBoundaries())
+               bounds.Append(self.GetVoxelSize() * val);
+           else
+             for(auto val : {self.GetVoxelData()->Getnx(),
+                   self.GetVoxelData()->Getny(),
+                   self.GetVoxelData()->Getnz()})
+               {
+                 bounds.Append(0);
+                 bounds.Append(val*self.GetVoxelSize());
+               }
+           return MoveToNumpyArray(bounds);
+         })
     ;
 
   py::class_<Smoother, shared_ptr<Smoother>, pyspdlog::LoggedClass>

@@ -29,6 +29,15 @@ namespace voxel2stl
 
     auto& GetVertexClustering() const { return vertex_clustering; }
 
+    size_t GetNVertices() const { return vertices.Size(); }
+    const Vertex& GetVertex(size_t index) const { return *vertices[index]; }
+
+    size_t GetNTriangles() const { return triangles.Size(); }
+    const Triangle& GetTriangle(size_t index) const  { return *triangles[index]; }
+    shared_ptr<Array<size_t>> GetBoundaries() { return boundaries; }
+    double GetVoxelSize() const { return m; }
+    shared_ptr<VoxelData> GetVoxelData() { return data; }
+
   private:
     inline bool isUsedVoxel(size_t x, size_t y, size_t z)
     {

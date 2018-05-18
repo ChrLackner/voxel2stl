@@ -4,3 +4,4 @@ tests/*.out
 tests/*.stl
 tests/*.raw
 tests/debug*
+tests/__pycache__
