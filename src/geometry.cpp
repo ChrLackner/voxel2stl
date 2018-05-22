@@ -102,6 +102,7 @@ namespace voxel2stl
                        " round = " + std::to_string(sum_size));
           }
       }
+    log->info("Triangles generated.");
   }
 
   void VoxelSTLGeometry :: PartitionVertices()
@@ -130,6 +131,7 @@ namespace voxel2stl
     for (auto i : Range(vertex_clustering.Size()))
       log->debug("Cluster " + std::to_string(i+1) + " has " + std::to_string(vertex_clustering[i]->Size()) + " vertices.");
     log->flush();
+    log->info("Partitioning done.");
   }
 
   void VoxelSTLGeometry :: SubdivideTriangles()

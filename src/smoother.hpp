@@ -32,16 +32,16 @@ namespace voxel2stl
         num_threads = omp_get_num_threads();
       }
       double e = 0; double e_diff = 0;
-      log->info("Minimize energy with " + std::to_string(num_threads) + " threads");
+      log->info("Minimize energy with " + std::to_string(num_threads) + " threads...");
       auto& vertex_clustering = geo->GetVertexClustering();
       for (size_t cluster = 0; cluster<vertex_clustering.Size(); cluster++)
         {
-          // #pragma omp parallel for
+          #pragma omp parallel for
           for (size_t i = 0; i < vertex_clustering[cluster]->Size();i++)
             {
               double energy, energydifference;
               std::tie(energy,energydifference) = Newton((*vertex_clustering[cluster])[i]);
-              // #pragma omp critical (e)
+              #pragma omp critical (e)
               {
                 e += energy;
                 e_diff += energydifference;
@@ -49,13 +49,17 @@ namespace voxel2stl
               // vertex->SetRatio((1-weight_minimum)*vertex->ratio+(weight_minimum)*r);
             }
         }
+      log->info("Smoothing done.");
     }
-
-    Array<float> CalcEnergy() const override
+    virtual Array<float> CalcEnergy() const override
     {
-      Array<float> energy(geo->GetNVertices());
-      for (auto i : Range(geo->GetNVertices()))
-        energy[i] = E::Energy(geo->GetVertex(i));
+      Array<float> energy;
+      energy.SetAllocSize(geo->GetNTriangles() * 3);
+      for (auto i : Range(geo->GetNTriangles()))
+        for(auto v : { geo->GetTriangle(i).v1,
+                       geo->GetTriangle(i).v2,
+                       geo->GetTriangle(i).v3})
+          energy.Append(E::Energy(v));
       return std::move(energy);
     }
 

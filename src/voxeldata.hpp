@@ -15,6 +15,17 @@ namespace voxel2stl
     VoxelData(std::string filename, size_t anx, size_t any, size_t anz, double am,
               shared_ptr<spdlog::logger> alog);
 
+    VoxelData(Array<unsigned char>& adata, size_t anx, size_t any, size_t anz, double am,
+              shared_ptr<spdlog::logger> alog)
+      : nx(anx), ny(any), nz(anz), m(am), LoggedClass(alog)
+    {
+      data.Swap(adata);
+      for(auto i : Range(nx*ny*nz))
+        if(data[i])
+          if(!material_names.count(data[i]))
+            material_names[data[i]] = "mat" + std::to_string(data[i]);
+    }
+
     void WriteMaterials(const string & filename) const;
     void WriteMaterials(const string & filename, const Array<size_t>& region) const;
 

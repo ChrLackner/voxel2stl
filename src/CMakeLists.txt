@@ -1,11 +1,11 @@
 
-pybind11_add_module(voxel2stl SHARED
+add_ngsolve_python_module(voxel2stl
   python_voxel2stl.cpp
   geometry.cpp
   voxeldata.cpp
   )
 
-target_link_libraries(voxel2stl PRIVATE ngs_core)
+# target_link_libraries(voxel2stl PRIVATE ngs_core)
 
 set_target_properties(voxel2stl PROPERTIES
   PREFIX "lib"

@@ -1,12 +1,11 @@
 
 #include "voxel2stl.hpp"
 #include <stdio.h>
-#include <pybind11/pybind11.h>
+#include <python_ngstd.hpp>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 
 using namespace voxel2stl;
-namespace py = pybind11;
 
 
 template<typename T>
@@ -27,12 +26,27 @@ void ExportVoxel2STL(py::module & m)
 {
   py::class_<VoxelData,shared_ptr<VoxelData>>
     (m,"VoxelData", "Container for loading of voxel data")
-    .def("__init__", [](VoxelData* instance, string& filename, size_t nx, size_t ny, size_t nz,
-                        double m, shared_ptr<spdlog::logger> log)
-         {
-           new (instance) VoxelData(filename, nx, ny, nz, m, log);
-         }, py::arg("filename"), py::arg("nx"), py::arg("ny"), py::arg("nz"), py::arg("m"),
+    .def(py::init<string, size_t, size_t, size_t, double, shared_ptr<spdlog::logger>>(),
+         py::arg("filename"), py::arg("nx"), py::arg("ny"), py::arg("nz"), py::arg("m"),
          py::arg("log") = make_shared<spdlog::logger>("VoxelData",make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
+    .def(py::pickle([](VoxelData& self)
+                    {
+                      MemoryView mv(&self.GetData()[0], self.GetData().Size());
+                      return py::make_tuple(self.Getnx(), self.Getny(), self.Getnz(), self.Getm(),
+                                            mv, self.GetMaterialNames());
+                    },
+                    [](py::tuple state)
+                    {
+                      auto mv = py::cast<MemoryView>(state[4]);
+                      Array<unsigned char> data(mv.Size(),(unsigned char*) mv.Ptr(),true);
+                      VoxelData voxel(data, state[0].cast<size_t>(), state[1].cast<size_t>(),
+                                      state[2].cast<size_t>(), state[3].cast<double>(),
+                                      make_shared<spdlog::logger>("VoxelData", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()));
+                      auto mats = state[5].cast<map<unsigned char, string>>();
+                      for (auto val : mats)
+                        voxel.SetMaterialName(val.first, val.second);
+                      return voxel;
+                    }))
     .def("WriteMaterials", (void (VoxelData::*)(const string&) const) &VoxelData::WriteMaterials,
          "Write the material number of each voxel with it's coordinates to an output file")
     .def("WriteMaterials",[](shared_ptr<VoxelData> self, string & filename, py::list aregion)
@@ -167,7 +181,7 @@ void ExportVoxel2STL(py::module & m)
              return MoveToNumpyArray(energy);
            }
          },py::call_guard<py::gil_scoped_release>())
-    ;
+        ;
 
   py::class_<NewtonSmoother<FirstEnergy>, shared_ptr<NewtonSmoother<FirstEnergy>>, Smoother>
     (m,"FirstSmoother", "First simple smoothing alg.")
@@ -181,7 +195,6 @@ void ExportVoxel2STL(py::module & m)
           py::arg("geo"), py::arg("logger") = make_shared<spdlog::logger>
           ("SimpleSmoother", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
     ;
-
 }
 
 
