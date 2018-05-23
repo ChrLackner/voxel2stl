@@ -2,6 +2,7 @@
 # define __FILE_SMOOTHER_HPP
 
 #include <omp.h>
+#include <math.h>
 
 namespace voxel2stl
 {
@@ -171,6 +172,28 @@ namespace voxel2stl
         sum += dof->xy;
       sum *= 1./(dofs.size());
       return abs(L2Norm(sum-vertex->xy));
+    }
+  };
+
+  // from http://www.cc.ac.cn/06research_report/0601.pdf
+  class AngleDeficit
+  {
+  public:
+    inline static double Energy(VoxelSTLGeometry::Vertex* vertex)
+    {
+      double energy = 2*M_PI;
+      double area = 0;
+      for(auto tri : vertex->neighbours)
+        {
+          area += tri->area;
+          double a = L2Norm(tri->OtherVertices(vertex,1)->xy - vertex->xy);
+          double b = L2Norm(tri->OtherVertices(vertex,2)->xy - vertex->xy);
+          double c = L2Norm(tri->OtherVertices(vertex,1)->xy - tri->OtherVertices(vertex,2)->xy);
+          double alpha = acos((a*a+b*b-c*c)/(2*a*b));
+          energy -= alpha;
+        }
+      energy *= 3./area;
+      return energy;
     }
   };
 

@@ -195,6 +195,12 @@ void ExportVoxel2STL(py::module & m)
           py::arg("geo"), py::arg("logger") = make_shared<spdlog::logger>
           ("SimpleSmoother", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
     ;
+  py::class_<NewtonSmoother<AngleDeficit>, shared_ptr<NewtonSmoother<AngleDeficit>>, Smoother>
+    (m,"AngleDeficitSmoother", "from http://www.cc.ac.cn/06research_report/0601.pdf")
+    .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
+          py::arg("geo"), py::arg("logger") = make_shared<spdlog::logger>
+          ("AngleDeficitSmoother", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()))
+    ;
 }
 
 
