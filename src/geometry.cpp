@@ -255,6 +255,7 @@ namespace voxel2stl
         vertex_clustering[vert->cluster]->Append(&*vert);
         vertices.Append(move(vert));
       }
+    log->info("done.");
   }
 
   void VoxelSTLGeometry :: GenerateTVCube(size_t x, size_t y, size_t z,
