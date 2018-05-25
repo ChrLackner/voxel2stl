@@ -3,26 +3,40 @@
 
 namespace voxel2stl
 {
+  class Smoother;
+
   class VoxelSTLGeometry : public pyspdlog::LoggedClass
   {
   public:
     struct Vertex;
     struct Triangle;
   private:
+    using Tclustering = Array<unique_ptr<Array<Vertex*>>>;
     shared_ptr<VoxelData> data;
     Array<unique_ptr<Vertex>> vertices;
     Array<unique_ptr<Triangle>> triangles;
     double m;
     int num_threads;
-    Array<unique_ptr<Array<Vertex*>>> vertex_clustering;
+    Tclustering vertex_clustering;
     shared_ptr<Array<size_t>> materials, boundaries;
     std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*> voxel_to_vertex;
 
   public:
     VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<size_t>> amaterials, shared_ptr<Array<size_t>> aboundaries, shared_ptr<spdlog::logger> log);
 
-    void ApplySmoothingStep(bool subdivision, double weight_area, double weight_minimum);
     void WriteSTL(string filename);
+    void SubdivideTriangles();
+
+    auto& GetVertexClustering() const { return vertex_clustering; }
+
+    size_t GetNVertices() const { return vertices.Size(); }
+    Vertex* GetVertex(size_t index) const { return vertices[index].get(); }
+
+    size_t GetNTriangles() const { return triangles.Size(); }
+    const Triangle& GetTriangle(size_t index) const  { return *triangles[index]; }
+    shared_ptr<Array<size_t>> GetBoundaries() { return boundaries; }
+    double GetVoxelSize() const { return m; }
+    shared_ptr<VoxelData> GetVoxelData() { return data; }
 
     size_t GetNVertices() const { return vertices.Size(); }
     const Vertex& GetVertex(size_t index) const { return *vertices[index]; }
@@ -50,12 +64,11 @@ namespace voxel2stl
     }
     void GenerateTrianglesAndVertices();
     void PartitionVertices();
-    void SubdivisionTriangles();
-    void MinimizeEnergy(double weight_area, double weight_minimum);
     void GenerateTVCube(size_t x, size_t y, size_t z,
                         Array<unique_ptr<Vertex>>& thread_vertices);
     Vertex* MakeVertex(Array<unique_ptr<Vertex>>& thread_vertices,
                        size_t x1, size_t y1, size_t z1, size_t x2, size_t y2, size_t z2);
+
   public:
     struct Vertex{
       //int x1,y1,z1;
@@ -78,6 +91,8 @@ namespace voxel2stl
         SetRatio(0.5*(v1->ratio+v2->ratio));
       }
       Vertex() { ; }
+      Vertex(const Vertex&) = delete;
+
       inline bool doIhave(Vec<3,double> &x, Vec<3,double> &y) {
         return ((x==this->x && y==this->y) || (x==this->y && y==this->x)); }
 
@@ -105,6 +120,25 @@ namespace voxel2stl
               }
           }
         throw Exception("Wanted to delete non existing neighbor!");
+      }
+
+      inline void FindFreeCluster()
+      {
+        auto cluster_free = [&](size_t cluster)
+          {
+            for (auto trig : neighbours)
+              for(auto other : {trig->OtherVertices(this,1), trig->OtherVertices(this,2)})
+                for (auto othertrig : other->neighbours)
+                  for (auto vert : {othertrig->v1, othertrig->v2, othertrig->v3})
+                    if(vert != this && vert->cluster == cluster)
+                      return false;
+            return true;
+          };
+        size_t clus = 0;
+        while (!cluster_free(clus))
+          clus++;
+        SPDLOG_DEBUG(log, "Vertex " + this->to_string() + " changed to cluster " + to_string(cluster));
+        this->cluster = clus;
       }
 
       inline string to_string() {
@@ -144,6 +178,8 @@ namespace voxel2stl
       {
 	this->UpdateNormal();
       }
+
+      Triangle(const Triangle&) = delete;
 
       inline void UpdateNormal()
       {
@@ -216,9 +252,6 @@ namespace voxel2stl
     };
 
   };
-
-  double Newton(std::function<double (double)>  func, double r0, double &energydifference, double & energy);
-
 
 }
 

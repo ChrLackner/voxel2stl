@@ -3,8 +3,9 @@
 
 
 #include <map>
+#include <set>
 #include <fstream>
-#include <ngs_core.hpp>
+#include <fem.hpp>
 #include "pyspdlog.hpp"
 namespace voxel2stl{
   using namespace std;
@@ -16,5 +17,6 @@ namespace voxel2stl{
 
 #include "voxeldata.hpp"
 #include "geometry.hpp"
+#include "smoother.hpp"
 
 #endif
