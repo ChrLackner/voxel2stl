@@ -14,6 +14,8 @@ namespace voxel2stl
     : pyspdlog::LoggedClass(log),
       data(adata), materials(amaterials), boundaries(aboundaries)
   {
+    if(!adata)
+      return;
     m = data->Getm();
 #pragma omp parallel
     {
@@ -102,6 +104,9 @@ namespace voxel2stl
                        " round = " + std::to_string(sum_size));
           }
       }
+    for(auto i : Range(vertices.Size()))
+      if(vertices[i]->nn <3)
+        cout << "WARNING: Vertex has less than 3 triangles: " << vertices[i]->xy << endl;
     log->info("Triangles generated.");
   }
 
@@ -285,7 +290,7 @@ namespace voxel2stl
         Array<Vertex*> tet(4);
         tet.SetSize0();
         size_t count = 0;
-        for(auto& i : tets)
+        for(auto i : tets)
           {
             if(isused[i[0]] - isused[i[1]])
               {
@@ -340,7 +345,13 @@ namespace voxel2stl
 
     Vec<3,double> x(x1,y1,z1);
     Vec<3,double> y(x2,y2,z2);
-    auto itV = voxel_to_vertex.find(make_tuple(x1,y1,z1,x2,y2,z2));
+
+
+    v2v_map::iterator itV;
+    // if we don't do this critically another thread may change the map in the meantime
+#pragma omp critical(voxel_to_vertex)
+    itV = voxel_to_vertex.find(make_tuple(x1,y1,z1,x2,y2,z2));
+
     if(itV != voxel_to_vertex.end())
       {
         auto vert = itV->second;
@@ -362,7 +373,7 @@ namespace voxel2stl
   void VoxelSTLGeometry::Triangle::
   MakeSubdivisionVertex(Array<Vertex*>& openVertices, Array<Vertex*>& vertex,
                         Array<unique_ptr<Vertex>>& newVertices,
-                        std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*>& vox_to_vert){
+                        v2v_map& vox_to_vert){
     bool deleteVertex = false;
     for(size_t j = 0; j < openVertices.Size(); j++)
       {

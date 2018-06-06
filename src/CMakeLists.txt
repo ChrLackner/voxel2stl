@@ -1,4 +1,8 @@
 
+if(TEST_GEOMETRY)
+  add_definitions(-DTEST_GEOMETRY)
+endif(TEST_GEOMETRY)
+
 add_ngsolve_python_module(voxel2stl
   python_voxel2stl.cpp
   geometry.cpp

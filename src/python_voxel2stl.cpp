@@ -4,6 +4,9 @@
 #include <python_ngstd.hpp>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
+#ifdef TEST_GEOMETRY
+#include "test_geometry.hpp"
+#endif // TEST_GEOMETRY
 
 using namespace voxel2stl;
 
@@ -85,8 +88,8 @@ void ExportVoxel2STL(py::module & m)
            Vec<3> size = {self.Getnx() * self.Getm(),
                                self.Getny() * self.Getm(),
                                self.Getnz() * self.Getm()};
-           Vec<3> bot = - 0.5 * size;
-           Vec<3> top = 1.5 * size;
+           Vec<3> bot = 0; // -0.5*self.Getm();
+           Vec<3> top = 2*size;
            auto pybot = py::make_tuple(bot[0],bot[1],bot[2]);
            auto pytop = py::make_tuple(top[0],top[1],top[2]);
            return py::make_tuple(pybot, pytop);
@@ -194,6 +197,10 @@ void ExportVoxel2STL(py::module & m)
              return MoveToNumpyArray(energy);
            }
          },py::call_guard<py::gil_scoped_release>())
+    .def("CalcVertexEnergy", [](Smoother& self, size_t index)
+         {
+           return self.CalcVertexEnergy(index);
+         })
         ;
 
   py::class_<NewtonSmoother<FirstEnergy>, shared_ptr<NewtonSmoother<FirstEnergy>>, Smoother>
@@ -206,12 +213,12 @@ void ExportVoxel2STL(py::module & m)
     .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
           py::arg("geo"), py::arg("logger") = CreateLogger("SimpleSmoother"))
     ;
-  py::class_<NewtonSmoother<AngleDeficit>, shared_ptr<NewtonSmoother<AngleDeficit>>, Smoother>
+  py::class_<NewtonSmoother<PatchEnergy<AngleDeficit>>, shared_ptr<NewtonSmoother<PatchEnergy<AngleDeficit>>>, Smoother>
     (m,"AngleDeficitSmoother", "from http://www.cc.ac.cn/06research_report/0601.pdf")
     .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
           py::arg("geo"), py::arg("logger") = CreateLogger("AngleDeficitSmoother"))
     ;
-  py::class_<NewtonSmoother<TaubinIntegralFormulation>, shared_ptr<NewtonSmoother<TaubinIntegralFormulation>>,
+  py::class_<NewtonSmoother<PatchEnergy<TaubinIntegralFormulation>>, shared_ptr<NewtonSmoother<PatchEnergy<TaubinIntegralFormulation>>>,
              Smoother>
     (m,"TaubinSmoother")
     .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
@@ -224,6 +231,99 @@ void ExportVoxel2STL(py::module & m)
     .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
           py::arg("geo"), py::arg("logger") = CreateLogger("FirstAndTaubinSmoother"))
     ;
+  m.def("GetClosestVertex", [](VoxelSTLGeometry& geo, py::tuple pnt)
+        {
+          Vec<3> p = {pnt[0].cast<double>(), pnt[1].cast<double>(), pnt[2].cast<double>()};
+          auto vertex = geo.GetClosestVertex(p);
+          return make_tuple(vertex->xy[0], vertex->xy[1], vertex->xy[2]);
+        });
+  m.def("GetVertexPatchArea", [](VoxelSTLGeometry& geo, py::tuple pnt)
+        {
+          Vec<3> p = {pnt[0].cast<double>(), pnt[1].cast<double>(), pnt[2].cast<double>()};
+          auto vertex = geo.GetClosestVertex(p);
+          double area = 0;
+          for(auto trig : vertex->neighbours)
+            area += trig->area;
+          return area;
+        });
+  m.def("GetVertexNumber", [](VoxelSTLGeometry& geo, py::tuple pnt)
+        {
+          Vec<3> p = {pnt[0].cast<double>(), pnt[1].cast<double>(), pnt[2].cast<double>()};
+          auto vertex = geo.GetVertex(0);
+          size_t index = 0;
+          for (auto i : Range(geo.GetNVertices()))
+            if (L2Norm(geo.GetVoxelSize() * geo.GetVertex(i)->xy - p) < L2Norm(geo.GetVoxelSize() * vertex->xy - p))
+              {
+                vertex = geo.GetVertex(i);
+                index = i;
+              }
+          return index;
+        });
+  m.def("GetVertexRatio", [](VoxelSTLGeometry& geo, size_t index)
+        {
+          return geo.GetVertex(index)->ratio;
+        });
+  m.def("SetVertexRatio", [](VoxelSTLGeometry& geo, size_t index, double ratio)
+        {
+          geo.GetVertex(index)->SetRatio(ratio);
+        });
+  m.def("GetEigenValues", [](VoxelSTLGeometry& geo, py::tuple pnt)
+        {
+          Vec<3> p = {pnt[0].cast<double>(), pnt[1].cast<double>(), pnt[2].cast<double>()};
+          auto vertex = geo.GetClosestVertex(p);
+          std::map<VoxelSTLGeometry::Vertex*,double> patch_w;
+          Vec<3> normal = 0;
+          for(auto trig : vertex->neighbours)
+            {
+              normal += trig->area * trig->n;
+              patch_w[trig->OtherVertices(vertex,0)] += trig->area;
+              patch_w[trig->OtherVertices(vertex,1)] += trig->area;
+              patch_w[trig->OtherVertices(vertex,0)] = 1;
+              patch_w[trig->OtherVertices(vertex,1)] = 1;
+            }
+          normal /= L2Norm(normal);
+          double normw = 0;
+          for (auto it : patch_w)
+            normw += it.second*it.second;
+          double fac = 1./sqrt(normw);
+          for(auto it : patch_w)
+            patch_w[it.first] *= fac;
+          Mat<3> M;
+          M = 0;
+          for (auto it : patch_w)
+            {
+              Vec<3> vi_minus_vj = vertex->xy - it.first->xy;
+              Vec<3> Tij = vi_minus_vj - VecTransVecMatrix<3>(normal) * (vi_minus_vj);
+              Tij *= 1./L2Norm(Tij);
+              double kij = 2 * InnerProduct(normal,vi_minus_vj)/L2Norm(vi_minus_vj);
+              M += it.second * kij * VecTransVecMatrix<3>(Tij);
+            }
+          double area = 0;
+          for (auto trig : vertex->neighbours)
+            area += trig->area;
+          //double energy = 0;
+          auto w = linalg::dsyevc3(M);
+          return py::make_tuple(w[0],w[1],w[2]);
+        });
+
+#ifdef TEST_GEOMETRY
+
+  py::class_<TestGeometry, shared_ptr<TestGeometry>, VoxelSTLGeometry>
+    (m,"TestGeometry")
+    .def(py::init([](py::array_t<double> verts, py::array_t<size_t> trigs,
+                     shared_ptr<spdlog::logger> log)
+                  {
+                    Array<double> averts(verts.size(), (double*) verts.data());
+                    Array<size_t> atrigs(trigs.size(), (size_t*) trigs.data());
+                    return TestGeometry(averts,atrigs,log);
+                  }), py::arg("vertices"), py::arg("triangles"),
+         py::arg("logger")=CreateLogger("TestGeometry"))
+    .def("GetBoundingBox ",[](TestGeometry& self)
+                          {
+                            return py::make_tuple(0,1,0,1,0,1);
+                          })
+    ;
+#endif //TEST_GEOMETRY
 }
 
 

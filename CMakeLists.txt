@@ -9,6 +9,8 @@ find_package(NGSolve CONFIG REQUIRED
   HINTS $ENV{NETGENDIR}/.. /opt/netgen/ /Applications/Netgen.app/Contents/Resources/CMake C:/netgen
   )
 
+option(TEST_GEOMETRY "Build additional geometry for testing")
+
 # ccache
 if(USE_CCACHE)
   find_program(CCACHE_FOUND ccache)

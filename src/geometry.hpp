@@ -10,7 +10,7 @@ namespace voxel2stl
   public:
     struct Vertex;
     struct Triangle;
-  private:
+  protected:
     using Tclustering = Array<unique_ptr<Array<Vertex*>>>;
     shared_ptr<VoxelData> data;
     Array<unique_ptr<Vertex>> vertices;
@@ -19,13 +19,23 @@ namespace voxel2stl
     int num_threads;
     Tclustering vertex_clustering;
     shared_ptr<Array<size_t>> materials, boundaries;
-    std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*> voxel_to_vertex;
+    using v2v_map = std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*>;
+    v2v_map voxel_to_vertex;
 
   public:
     VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<size_t>> amaterials, shared_ptr<Array<size_t>> aboundaries, shared_ptr<spdlog::logger> log);
 
     void WriteSTL(string filename);
     void SubdivideTriangles();
+
+    Vertex* GetClosestVertex(Vec<3> p)
+    {
+      Vertex* vertex = GetVertex(0);
+      for(auto& v : vertices)
+        if(L2Norm(m * v->xy - p) < L2Norm(m * vertex->xy - p))
+          vertex = &*v;
+      return vertex;
+    }
 
     auto& GetVertexClustering() const { return vertex_clustering; }
 
@@ -38,6 +48,8 @@ namespace voxel2stl
     double GetVoxelSize() const { return m; }
     shared_ptr<VoxelData> GetVoxelData() { return data; }
 
+  protected:
+    void PartitionVertices();
   private:
     inline bool isUsedVoxel(size_t x, size_t y, size_t z)
     {
@@ -54,7 +66,6 @@ namespace voxel2stl
       return false;
     }
     void GenerateTrianglesAndVertices();
-    void PartitionVertices();
     void GenerateTVCube(size_t x, size_t y, size_t z,
                         Array<unique_ptr<Vertex>>& thread_vertices);
     Vertex* MakeVertex(Array<unique_ptr<Vertex>>& thread_vertices,
@@ -72,16 +83,23 @@ namespace voxel2stl
       Array<Triangle*> neighbours;
       // cluster of vertex coloring
       size_t cluster;
+      // vertex patch of vertex
+      std::set<Vertex*> patch;
 
       Vertex(Vec<3,double> ax, Vec<3,double> ay) : x(ax), y(ay){
-        SetRatio(0.5); }
+        SetRatio(0.5);
+        patch.insert(this);
+      }
       Vertex(Vertex* v1, Vertex* v2)
       {
         x = 0.5*(v1->x+v2->x);
         y = 0.5*(v1->y+v2->y);
         SetRatio(0.5*(v1->ratio+v2->ratio));
+        patch.insert(this);
       }
-      Vertex() { ; }
+      Vertex() {
+        patch.insert(this);
+      }
       Vertex(const Vertex&) = delete;
 
       inline bool doIhave(Vec<3,double> &x, Vec<3,double> &y) {
@@ -98,6 +116,8 @@ namespace voxel2stl
       {
         neighbours.Append(tri);
         nn++;
+        for (auto v : {tri->v1,tri->v2,tri->v3})
+          patch.insert(v);
       }
       inline void DeleteNeighbour(Triangle* tri)
       {
@@ -107,6 +127,18 @@ namespace voxel2stl
               {
                 neighbours.DeleteElement(i);
                 nn--;
+                for(auto v : {tri->OtherVertices(this,0), tri->OtherVertices(this,1)})
+                  {
+                    bool isinother = false;
+                    for(auto tri : this->neighbours)
+                      if(tri->doIhave(v))
+                        {
+                          isinother = true;
+                          break;
+                        }
+                    if(!isinother)
+                      patch.erase(v);
+                  }
                 return;
               }
           }
@@ -117,12 +149,10 @@ namespace voxel2stl
       {
         auto cluster_free = [&](size_t cluster)
           {
-            for (auto trig : neighbours)
-              for(auto other : {trig->OtherVertices(this,1), trig->OtherVertices(this,2)})
-                for (auto othertrig : other->neighbours)
-                  for (auto vert : {othertrig->v1, othertrig->v2, othertrig->v3})
-                    if(vert != this && vert->cluster == cluster)
-                      return false;
+            for(auto v : patch)
+              for(auto v2 : v->patch)
+                if(v2 != this && v2->cluster == cluster)
+                  return false;
             return true;
           };
         size_t clus = 0;
@@ -235,7 +265,7 @@ namespace voxel2stl
 
       void MakeSubdivisionVertex(Array<Vertex*>& openVertices, Array<Vertex*>& vertex,
                                  Array<unique_ptr<Vertex>>& newVertices,
-                                 std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*>& vox_to_vert);
+                                 v2v_map& vox_to_vert);
       inline string to_string()
       {
         return string("Trig \n") + v1->to_string() + "\n" + v2->to_string() + "\n" + v3->to_string();
