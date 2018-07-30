@@ -39,6 +39,20 @@ namespace voxel2stl
     size_t Getny() const { return ny; }
     size_t Getnz() const { return nz; }
 
+    void EmbedInAir()
+    {
+      nx += 2; ny += 2; nz += 2;
+      Array<unsigned char> newdata(nx*ny*nz);
+      for(auto z : Range(nz))
+        for(auto y : Range(ny))
+          for(auto x : Range(nx))
+            if(x == 0 || y == 0 || z == 0 || x == nx-1 || y == ny-1 || z == nz-1)
+              newdata[x+nx*(y+ny*z)] = 0;
+            else
+              newdata[x+nx*(y+ny*z)] = data[(x-1) + (nx-2)*((y-1) + (ny-2) * (z-1))];
+      data.Swap(newdata);
+    }
+
     Array<unsigned char>& GetData() { return data; }
   };
 }

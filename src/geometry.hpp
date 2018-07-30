@@ -18,12 +18,13 @@ namespace voxel2stl
     double m;
     int num_threads;
     Tclustering vertex_clustering;
-    shared_ptr<Array<size_t>> materials, boundaries;
+    Array<size_t> materials, boundaries;
     using v2v_map = std::map<std::tuple<size_t,size_t,size_t,size_t,size_t,size_t>,Vertex*>;
     v2v_map voxel_to_vertex;
 
   public:
-    VoxelSTLGeometry(shared_ptr<VoxelData> adata, shared_ptr<Array<size_t>> amaterials, shared_ptr<Array<size_t>> aboundaries, shared_ptr<spdlog::logger> log);
+    VoxelSTLGeometry(shared_ptr<VoxelData> adata, const Array<size_t>& amaterials,
+                     const Array<size_t>& aboundaries, shared_ptr<spdlog::logger> log);
 
     void WriteSTL(string filename);
     void SubdivideTriangles();
@@ -44,7 +45,7 @@ namespace voxel2stl
 
     size_t GetNTriangles() const { return triangles.Size(); }
     const Triangle& GetTriangle(size_t index) const  { return *triangles[index]; }
-    shared_ptr<Array<size_t>> GetBoundaries() { return boundaries; }
+    Array<size_t>& GetBoundaries() { return boundaries; }
     double GetVoxelSize() const { return m; }
     shared_ptr<VoxelData> GetVoxelData() { return data; }
 
@@ -53,15 +54,19 @@ namespace voxel2stl
   private:
     inline bool isUsedVoxel(size_t x, size_t y, size_t z)
     {
-      if (boundaries)
+      SPDLOG_DEBUG(log, "Check voxel (" + to_string(x) + "," + to_string(y) + "," + to_string(z) + ")");
+      if (boundaries.Size())
         {
-          if (x < (*boundaries)[0] || x > (*boundaries)[1] || y < (*boundaries)[2] || y > (*boundaries)[3]
-              || z < (*boundaries)[4] || z > (*boundaries)[5])
+          if (x < boundaries[0] || x > boundaries[1] || y < boundaries[2] || y > boundaries[3]
+              || z < boundaries[4] || z > boundaries[5]){
+            SPDLOG_DEBUG(log, "Out of boundaries");
             return false;
+          }
         }
-      if (!materials)
+      SPDLOG_DEBUG(log, "In boundaries, material = " + to_string((*data)(x,y,z)));
+      if (!materials.Size())
         return (*data)(x,y,z);
-      if (materials->Contains((*data)(x,y,z)))
+      if (materials.Contains((*data)(x,y,z)))
         return true;
       return false;
     }
@@ -158,7 +163,7 @@ namespace voxel2stl
         size_t clus = 0;
         while (!cluster_free(clus))
           clus++;
-        SPDLOG_DEBUG(log, "Vertex " + this->to_string() + " changed to cluster " + to_string(cluster));
+        // SPDLOG_DEBUG(log, "Vertex " + to_string() + " changed to cluster " + std::to_string(cluster));
         this->cluster = clus;
       }
 

@@ -127,8 +127,8 @@ namespace voxel2stl
           normal += trig->area * trig->n;
           patch_w[trig->OtherVertices(vertex,0)] += trig->area;
           patch_w[trig->OtherVertices(vertex,1)] += trig->area;
-          patch_w[trig->OtherVertices(vertex,0)] = 1;
-          patch_w[trig->OtherVertices(vertex,1)] = 1;
+          // patch_w[trig->OtherVertices(vertex,0)] = 1;
+          // patch_w[trig->OtherVertices(vertex,1)] = 1;
         }
       normal /= L2Norm(normal);
       double normw = 0;
@@ -180,7 +180,137 @@ namespace voxel2stl
       return fac *E1::Energy(vertex) + (1.-fac)*E2::Energy(vertex);
     }
   };
-}
 
+  // from: https://arxiv.org/pdf/cs/0510090.pdf
+  class CurvatureEstimation
+  {
+  public:
+    inline static double Energy(VoxelSTLGeometry::Vertex* vert)
+    {
+      auto vals = EigenValues(vert);
+      double area = 0.;
+      for(auto trig : vert->neighbours)
+        area += trig->area;
+      return L2Norm(vals) * sqrt(area);
+      // auto grad = vertexGradient(vert);
+      // auto normal = vertexNormal(vert);
+      // Mat<3> basis = Identity(3);
+      // for(auto i : Range(3))
+      //   basis.Col(i) -= InnerProduct(basis.Col(i), normal) * normal;
+      // int smallest_index = 0;
+      // double smallest_value = 1e99;
+      // for(auto i : Range(3))
+      //   {
+      //     double val = L2Norm(basis.Col(i));
+      //     if (val < smallest_value)
+      //       {
+      //         smallest_value = val;
+      //         smallest_index = i;
+      //       }
+      //   }
+      // std::vector<int> indices;
+      // for(int i : Range(3))
+      //   if(i != smallest_index)
+      //     indices.push_back(i);
+      // Vec<3> t1 = basis.Col(indices[0]);
+      // Vec<3> t2 = basis.Col(indices[1]);
+      // t1 *= 1./L2Norm(t1);
+      // t2 *= 1./L2Norm(t2);
+      // t2 -= InnerProduct(t1,t2) * t1;
+      // t2 *= 1./L2Norm(t2);
+      // t1 -= InnerProduct(normal, t1) * normal;
+      // t2 -= InnerProduct(normal, t2) * normal;
+      // t1 *= 1./L2Norm(t1);
+      // t2 *= 1./L2Norm(t2);
+      // t2 -= InnerProduct(t1,t2) * t1;
+      // t2 *= 1./L2Norm(t2);
+      // // cout << "***************************************************************" << endl;
+      // // cout << "normal = " << normal << endl;
+      // // cout << "indices = " << indices.size() << ": " << indices[0] << ", " << indices[1] << endl;
+      // // cout << "grad = " << grad << endl;
+      // // cout << "t1 = " << t1 << endl;
+      // // cout << "t2 = " << t2 << endl;
+      // Mat<2> mat;
+      // mat(0,0) = InnerProduct(t1,grad*t1);
+      // mat(0,1) = InnerProduct(t1,grad*t2);
+      // mat(1,0) = InnerProduct(t2,grad*t1);
+      // mat(1,1) = InnerProduct(t2,grad*t2);
+      // // cout << "mat = " << mat << endl;
+      // auto curv = Det(mat);
+      // // cout << "curvature = " << curv << endl;
+      // return fabs(curv);
+    }
+
+    inline static Vec<3> EigenValues(VoxelSTLGeometry::Vertex* vert)
+    {
+      auto grad = vertexGradient(vert);
+      auto w = linalg::dsyevc3(grad);
+      return w;
+    }
+
+    inline static Vec<3> vertexNormal(VoxelSTLGeometry::Vertex* vert)
+    {
+      auto weights = computePatchWeights(vert);
+      Vec<3> normal = 0.;
+      for(auto i : Range(vert->nn))
+        normal += weights[i] * vert->neighbours[i]->n;
+      normal *= 1./L2Norm(normal);
+      return normal;
+    }
+
+    inline static std::vector<double> computePatchWeights(VoxelSTLGeometry::Vertex* vert)
+    {
+      std::vector<double> weights;
+      weights.reserve(vert->nn);
+      for(auto trig : vert->neighbours)
+        weights.push_back(1./L2Norm2(centroid(trig)-vert->xy));
+      double sum = 0.;
+      for(auto val : weights)
+        sum += val;
+      for(auto& val : weights)
+        val /= sum;
+      return weights;
+    }
+
+    inline static Vec<3> centroid(VoxelSTLGeometry::Triangle* trig)
+    {
+      return 1./3 * (trig->v1->xy + trig->v2->xy + trig->v3->xy);
+    }
+
+    inline static Mat<3,3> faceGradient(VoxelSTLGeometry::Vertex* vert, VoxelSTLGeometry::Triangle* trig)
+    {
+      Mat<2> mat;
+      Mat<2> invmat;
+      auto vj = trig->OtherVertices(vert,0);
+      auto vk = trig->OtherVertices(vert,1);
+      mat(0,0) = InnerProduct(vj->xy - vert->xy, vj->xy - vert->xy);
+      mat(0,1) = InnerProduct(vj->xy - vert->xy, vk->xy - vert->xy);
+      mat(1,0) = InnerProduct(vj->xy - vert->xy, vk->xy - vert->xy);
+      mat(1,1) = InnerProduct(vk->xy - vert->xy, vk->xy - vert->xy);
+      CalcInverse(mat,invmat);
+      Mat<3> result;
+      Vec<3> gvj = vertexNormal(vj);
+      Vec<3> gvk = vertexNormal(vk);
+      Vec<3> gvert = vertexNormal(vert);
+      for(auto i : Range(3))
+        {
+          Vec<2> gvals = { gvj[i] - gvert[i] , gvk[i] - gvert[i] };
+          Vec<2> sol = invmat * gvals;
+          result.Col(i) = sol[0] * (vj->xy - vert->xy) + sol[1] * (vk->xy - vert->xy);
+        }
+      return result;
+    }
+
+    inline static Mat<3> vertexGradient(VoxelSTLGeometry::Vertex* vert)
+    {
+      Mat<3> grad = 0.;
+      auto weights = computePatchWeights(vert);
+      for(auto i : Range(vert->nn))
+        grad += weights[i] * faceGradient(vert, vert->neighbours[i]);
+      return grad;
+    }
+  };
+
+}
 
 # endif // __FILE_V2S_ENERGY_HPP

@@ -49,6 +49,7 @@ void ExportVoxel2STL(py::module & m)
                         voxel.SetMaterialName(val.first, val.second);
                       return voxel;
                     }))
+    .def("EmbedInAir", &VoxelData::EmbedInAir)
     .def("WriteMaterials", (void (VoxelData::*)(const string&) const) &VoxelData::WriteMaterials,
          "Write the material number of each voxel with it's coordinates to an output file")
     .def("WriteMaterials",[](shared_ptr<VoxelData> self, string & filename, py::list aregion)
@@ -102,27 +103,20 @@ void ExportVoxel2STL(py::module & m)
     .def(py::init([](shared_ptr<VoxelData> data,
                      py::object mats, py::object bnds, shared_ptr<spdlog::logger> log)
          {
-           shared_ptr<Array<size_t>> materials = nullptr;
-           shared_ptr<Array<size_t>> boundaries = nullptr;
-           if (!mats.is_none())
-             {
-               auto matlist = py::cast<py::list>(mats);
-               materials = make_shared<Array<size_t>>(py::len(matlist));
-               materials->SetSize(0);
-               for (auto mat : matlist)
-                 materials->Append(py::cast<size_t>(mat));
-             }
-           if (!bnds.is_none())
-             {
-               auto bndlist = py::cast<py::list>(bnds);
-               boundaries = make_shared<Array<size_t>>(py::len(bndlist));
-               boundaries->SetSize(0);
-               for (auto bnd : bndlist)
-                 boundaries->Append(py::cast<size_t>(bnd));
-             }
+           Array<size_t> materials;
+           Array<size_t> boundaries;
+           {
+             py::gil_scoped_acquire ac;
+             if (!mats.is_none())
+               for (auto mat : py::cast<py::list>(mats))
+                 materials.Append(py::cast<size_t>(mat));
+             if (!bnds.is_none())
+               for (auto bnd : py::cast<py::list>(bnds))
+               boundaries.Append(py::cast<size_t>(bnd));
+           }
            return VoxelSTLGeometry(data,materials,boundaries,log);
          }), py::arg("voxeldata"), py::arg("materials")=nullptr, py::arg("boundaries")=nullptr,
-         py::arg("logger") = CreateLogger("VoxelSTLGeometry"))
+         py::arg("logger") = CreateLogger("VoxelSTLGeometry"), py::call_guard<py::gil_scoped_release>())
     .def("SubdivideTriangles", &VoxelSTLGeometry::SubdivideTriangles)
     .def("WriteSTL", &VoxelSTLGeometry::WriteSTL)
     .def("GetData", [](VoxelSTLGeometry& self)
@@ -157,8 +151,8 @@ void ExportVoxel2STL(py::module & m)
     .def("GetBoundingBox", [](VoxelSTLGeometry& self)
          {
            Array<double> bounds;
-           if(self.GetBoundaries())
-             for (auto val : *self.GetBoundaries())
+           if(self.GetBoundaries().Size())
+             for (auto val : self.GetBoundaries())
                bounds.Append(self.GetVoxelSize() * val);
            else
              for(auto val : {self.GetVoxelData()->Getnx(),
@@ -210,6 +204,12 @@ void ExportVoxel2STL(py::module & m)
     .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
           py::arg("geo"), py::arg("logger") = CreateLogger("TaubinSmoother"))
     ;
+  py::class_<NewtonSmoother<PatchEnergy<CurvatureEstimation>>, shared_ptr<NewtonSmoother<PatchEnergy<CurvatureEstimation>>>,
+             Smoother>
+    (m,"CurvatureSmoother")
+    .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
+          py::arg("geo"), py::arg("logger") = CreateLogger("CurvatureSmoother"))
+    ;
   py::class_<NewtonSmoother<WeightedEnergy<FirstEnergy,TaubinIntegralFormulation,70>>,
              shared_ptr<NewtonSmoother<WeightedEnergy<FirstEnergy,TaubinIntegralFormulation,70>>>,
              Smoother>
@@ -257,39 +257,43 @@ void ExportVoxel2STL(py::module & m)
         {
           Vec<3> p = {pnt[0].cast<double>(), pnt[1].cast<double>(), pnt[2].cast<double>()};
           auto vertex = geo.GetClosestVertex(p);
-          std::map<VoxelSTLGeometry::Vertex*,double> patch_w;
-          Vec<3> normal = 0;
-          for(auto trig : vertex->neighbours)
-            {
-              normal += trig->area * trig->n;
-              patch_w[trig->OtherVertices(vertex,0)] += trig->area;
-              patch_w[trig->OtherVertices(vertex,1)] += trig->area;
-              patch_w[trig->OtherVertices(vertex,0)] = 1;
-              patch_w[trig->OtherVertices(vertex,1)] = 1;
-            }
-          normal /= L2Norm(normal);
-          double normw = 0;
-          for (auto it : patch_w)
-            normw += it.second*it.second;
-          double fac = 1./sqrt(normw);
-          for(auto it : patch_w)
-            patch_w[it.first] *= fac;
-          Mat<3> M;
-          M = 0;
-          for (auto it : patch_w)
-            {
-              Vec<3> vi_minus_vj = vertex->xy - it.first->xy;
-              Vec<3> Tij = vi_minus_vj - VecTransVecMatrix<3>(normal) * (vi_minus_vj);
-              Tij *= 1./L2Norm(Tij);
-              double kij = 2 * InnerProduct(normal,vi_minus_vj)/L2Norm(vi_minus_vj);
-              M += it.second * kij * VecTransVecMatrix<3>(Tij);
-            }
-          double area = 0;
-          for (auto trig : vertex->neighbours)
-            area += trig->area;
-          //double energy = 0;
-          auto w = linalg::dsyevc3(M);
-          return py::make_tuple(w[0],w[1],w[2]);
+          auto evals = CurvatureEstimation::EigenValues(vertex);
+          return py::make_tuple(evals[0],evals[1], evals[2]);
+          // Vec<3> p = {pnt[0].cast<double>(), pnt[1].cast<double>(), pnt[2].cast<double>()};
+          // auto vertex = geo.GetClosestVertex(p);
+          // std::map<VoxelSTLGeometry::Vertex*,double> patch_w;
+          // Vec<3> normal = 0;
+          // for(auto trig : vertex->neighbours)
+          //   {
+          //     normal += trig->area * trig->n;
+          //     patch_w[trig->OtherVertices(vertex,0)] += trig->area;
+          //     patch_w[trig->OtherVertices(vertex,1)] += trig->area;
+          //     patch_w[trig->OtherVertices(vertex,0)] = 1;
+          //     patch_w[trig->OtherVertices(vertex,1)] = 1;
+          //   }
+          // normal /= L2Norm(normal);
+          // double normw = 0;
+          // for (auto it : patch_w)
+          //   normw += it.second*it.second;
+          // double fac = 1./sqrt(normw);
+          // for(auto it : patch_w)
+          //   patch_w[it.first] *= fac;
+          // Mat<3> M;
+          // M = 0;
+          // for (auto it : patch_w)
+          //   {
+          //     Vec<3> vi_minus_vj = vertex->xy - it.first->xy;
+          //     Vec<3> Tij = vi_minus_vj - VecTransVecMatrix<3>(normal) * (vi_minus_vj);
+          //     Tij *= 1./L2Norm(Tij);
+          //     double kij = 2 * InnerProduct(normal,vi_minus_vj)/L2Norm(vi_minus_vj);
+          //     M += it.second * kij * VecTransVecMatrix<3>(Tij);
+          //   }
+          // double area = 0;
+          // for (auto trig : vertex->neighbours)
+          //   area += trig->area;
+          // //double energy = 0;
+          // auto w = linalg::dsyevc3(M);
+          // return py::make_tuple(w[0],w[1],w[2]);
         });
 
 #ifdef TEST_GEOMETRY

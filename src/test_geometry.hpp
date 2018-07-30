@@ -11,8 +11,8 @@ namespace voxel2stl
     TestGeometry(Array<double>& avertices, Array<size_t>& atrigs,
                  shared_ptr<spdlog::logger> log)
       : VoxelSTLGeometry(nullptr,
-                         nullptr,
-                         nullptr,
+                         Array<size_t>(),
+                         Array<size_t>(),
                          log)
     {
       m = 1;

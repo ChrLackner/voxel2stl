@@ -1,15 +1,28 @@
 
+//#define SPDLOG_DEBUG_ON
 #include "voxel2stl.hpp"
 #include <omp.h>
 #include <set>
 #include <assert.h>
 
+namespace std
+{
+  template<int N>
+  string to_string(ngbla::Vec<N> vec)
+  {
+    string str = "(" + to_string(vec[0]);
+    for(auto i : Range(1,N))
+      str += ", " + to_string(vec[i]);
+    str += ")";
+    return str;
+  }
+}
 
 namespace voxel2stl
 {
   VoxelSTLGeometry::VoxelSTLGeometry(shared_ptr<VoxelData> adata,
-                                     shared_ptr<Array<size_t>> amaterials,
-                                     shared_ptr<Array<size_t>> aboundaries,
+                                     const Array<size_t>& amaterials,
+                                     const Array<size_t>& aboundaries,
                                      shared_ptr<spdlog::logger> log)
     : pyspdlog::LoggedClass(log),
       data(adata), materials(amaterials), boundaries(aboundaries)
@@ -76,6 +89,12 @@ namespace voxel2stl
     Array<unique_ptr<Vertex>> thread_vertices[num_threads];
     log->debug("Data size is " + to_string(data->Getnx()) + " x " + to_string(data->Getny()) + " x " +
                to_string(data->Getnz()));
+    log->debug("Boundaries are:\nx: " + to_string(boundaries[0]) + " to " + to_string(boundaries[1]) + "\ny: " +
+               to_string(boundaries[2]) + " to " + to_string(boundaries[3]) + "\nz: " + to_string(boundaries[4]) +
+               " to " + to_string(boundaries[5]));
+    log->debug("Materials are:");
+    for(auto val : materials)
+      log->debug(to_string(val));
 
     size_t sum_size = 0;
     int count = 0;
@@ -84,9 +103,9 @@ namespace voxel2stl
         for(auto ixiz : {true,false})
           {
 #pragma omp parallel for
-            for (size_t ix=0; ix<data->Getnx()-1; ix++)
-              for (size_t iy=0; iy<data->Getny()-1;iy++)
-                for (size_t iz = 0; iz < data->Getnz()-1; iz++)
+            for (size_t ix=max2(0,int(boundaries[0])-2); ix<min2(data->Getnx()-1, boundaries[1]+2); ix++)
+              for (size_t iy=max2(0,int(boundaries[2])-2); iy<min2(data->Getny()-1, boundaries[3]+2);iy++)
+                for (size_t iz = max2(0,int(boundaries[4])-2); iz < min2(data->Getnz()-1,boundaries[5]+2); iz++)
                   if((ix+iy)%2==ixiy)
                     if((ix+iz)%2==ixiz)
                       GenerateTVCube(ix, iy, iz, thread_vertices[omp_get_thread_num()]);
@@ -106,7 +125,7 @@ namespace voxel2stl
       }
     for(auto i : Range(vertices.Size()))
       if(vertices[i]->nn <3)
-        cout << "WARNING: Vertex has less than 3 triangles: " << vertices[i]->xy << endl;
+        log->warn("Vertex has less than 3 triangles: " + to_string(vertices[i]->xy));
     log->info("Triangles generated.");
   }
 
@@ -278,8 +297,12 @@ namespace voxel2stl
     bool isused[8] = {isUsedVoxel(x,y,z),isUsedVoxel(x,y,z+one),isUsedVoxel(x,y+one,z),
                       isUsedVoxel(x,y+one,z+one),isUsedVoxel(x+one,y,z),isUsedVoxel(x+one,y,z+one),
                       isUsedVoxel(x+one,y+one,z),isUsedVoxel(x+one,y+one,z+one)};
+    SPDLOG_DEBUG(log, "Is used = ");
+    for(auto i : Range(8))
+      SPDLOG_DEBUG(log,to_string(isused[i]));
     if (std::all_of(std::begin(isused),std::end(isused),[](bool b) { return !b; }))
       return;
+    SPDLOG_DEBUG(log, "Not all are unused");
     unsigned char combinations[5][6][2] = {{{0,4},{0,2},{0,1},{4,2},{4,1},{2,1}},
                                            {{4,6},{6,7},{4,7},{2,6},{4,2},{2,7}},
                                            {{4,1},{4,5},{1,5},{4,7},{1,7},{5,7}},
@@ -302,6 +325,8 @@ namespace voxel2stl
                 count++;
               }
           }
+        SPDLOG_DEBUG(log, "Found " + to_string(count) + " cuttings in voxel " + to_string(x) + ", " +
+                     to_string(y) + ", " + to_string(z));
         if(count >= 3) {
           auto triangle1 = make_unique<Triangle>(tet[0],tet[1],tet[2]);
           SPDLOG_DEBUG(log,"Created new triangle1: " + triangle1->to_string());
