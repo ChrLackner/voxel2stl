@@ -15,6 +15,8 @@ namespace voxel2stl
       double e = 0;
       for(auto v : vertex->patch)
         e += E::Energy(v);
+      e *= 1./(vertex->patch.size());
+      e += E::Energy(vertex);
       return e;
     }
   };
@@ -39,17 +41,17 @@ namespace voxel2stl
                   if(trig2->doIhave(trig_v1) || trig2->doIhave(trig_v2))
                     fair = 1;
                   else
-                    fair = 1;
+                    fair = 3;
                   double cosAngle = InnerProduct(trig->n, trig2->n);
                   cosAngle = (1-cosAngle)*(1-cosAngle);
                   E += fair * cosAngle/sqrt(trig->area*trig->area + trig2->area*trig2->area);
                 }
             }
         }
-      // double area = 0.;
-      // for (auto trig : vertex->neighbours)
-      //   area += trig->area;
-      // E *= sqrt(area);
+      double area = 0.;
+      for (auto trig : vertex->neighbours)
+        area += trig->area;
+      E *= sqrt(area);
 
       return E;
     }
@@ -100,19 +102,16 @@ namespace voxel2stl
   class VecTransVecMatrix : public MatExpr<VecTransVecMatrix<H>>
   {
   private:
-    Vec<H>& vec;
+    Vec<H> vec;
   public:
-    VecTransVecMatrix(Vec<H>& avec) : vec(avec) { }
+    VecTransVecMatrix(const Vec<H>& avec) : vec(avec) { }
     double operator() (int i) const
     {
       return vec[i%H]*vec[i/H];
     }
-    ///
     double operator() (int i, int j) const { return vec[i]*vec[j]; }
 
-    /// the height
     int Height () const { return H; }
-    /// the width
     int Width () const { return H; }
   };
 

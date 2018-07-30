@@ -19,20 +19,6 @@ shared_ptr<spdlog::logger> CreateLogger(string name)
   return logger;
 }
 
-template<typename T>
-py::object MoveToNumpyArray( ngstd::Array<T> &a )
-{
-  if(a.Size()) {
-      py::capsule free_when_done(&a[0], [](void *f) {
-                                 delete [] reinterpret_cast<T *>(f);
-                                 });
-      a.NothingToDelete();
-      return py::array_t<T>(a.Size(), &a[0], free_when_done);
-  }
-  else
-      return py::array_t<T>(0, nullptr);
-}
-
 void ExportVoxel2STL(py::module & m)
 {
   global_sink->set_level(spdlog::level::info);
