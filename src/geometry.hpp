@@ -45,6 +45,7 @@ namespace voxel2stl
 
     size_t GetNTriangles() const { return triangles.Size(); }
     const Triangle& GetTriangle(size_t index) const  { return *triangles[index]; }
+    Triangle& GetTriangle(size_t index)  { return *triangles[index]; }
     Array<size_t>& GetBoundaries() { return boundaries; }
     double GetVoxelSize() const { return m; }
     shared_ptr<VoxelData> GetVoxelData() { return data; }
@@ -156,7 +157,8 @@ namespace voxel2stl
           {
             for(auto v : patch)
               for(auto v2 : v->patch)
-                if(v2 != this && v2->cluster == cluster)
+                for(auto v3 : v->patch)
+                  if(v3 != this && v3->cluster == cluster)
                   return false;
             return true;
           };
@@ -213,7 +215,8 @@ namespace voxel2stl
 	Vec<3,double> temp2 = v3->xy-v1->xy;
 	n = Cross(temp1,temp2);
 	area = L2Norm(n); //double area...
-	if (area == 0) cout << "area = 0 in updateNormal" << endl;
+	if (area < 1e-10)
+          cout << "area almost 0 in updateNormal!" << endl;
 	n = 1/area*n;
 	area /= 2;
       }
@@ -266,6 +269,7 @@ namespace voxel2stl
 	if (subdivisionParameter == 2){
           return 0;
 	}
+        throw Exception("Shouldn't get here");
       }
 
       void MakeSubdivisionVertex(Array<Vertex*>& openVertices, Array<Vertex*>& vertex,

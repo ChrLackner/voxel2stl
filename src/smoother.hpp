@@ -26,6 +26,17 @@ namespace voxel2stl
       cout << "CalcVertexEnergy not implemented for this Energy!" << endl;
       return 0;
     }
+    virtual size_t MarkTriangles()
+    {
+      // default is to mark if Energy is larger than 1 in one vertex
+      // (energy should be scaled in a way that that makes sense)
+      size_t sum = 0;
+      auto energies = CalcEnergy();
+      for(size_t i = 0; i < energies.Size(); i += 3)
+        if(energies[i] > 1 || energies[i+1] > 1 || energies[i+2] > 1)
+          sum += geo->GetTriangle(i/3).SetSubdivisionParameter();
+      return sum;
+    }
   };
 
   template<typename E>
@@ -80,8 +91,8 @@ namespace voxel2stl
       double energydifference = 0;
       //newton method
       int count = 0;
-      double eps = 1e-3; //try 1e-2 or 1e-3
-      double h = 1e-6; //h must be smaller than eps
+      double eps = 1e-2; //try 1e-2 or 1e-3
+      double h = 1e-5; //h must be smaller than eps
       double w=1;
       // static int totcount = 0;
       // if(totcount > 4)

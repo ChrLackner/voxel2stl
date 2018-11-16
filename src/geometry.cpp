@@ -161,19 +161,6 @@ namespace voxel2stl
   void VoxelSTLGeometry :: SubdivideTriangles()
   {
     log->info("Start subdividing triangles");
-    double smaller_than = 0.8;
-    //first step: determine triangles to be divided and their neighbours
-    size_t sum = 0;
-    for (size_t i = 0; i < triangles.Size(); i++){
-      bool divide = false;
-      //if cos(angle) between normals < 0.8 divide true
-      if ( InnerProduct(triangles[i]->n, triangles[i]->NeighbourTriangle(triangles[i]->v1)->n)<smaller_than) divide = true;
-      if ( InnerProduct(triangles[i]->n, triangles[i]->NeighbourTriangle(triangles[i]->v2)->n)<smaller_than) divide = true;
-      if ( InnerProduct(triangles[i]->n, triangles[i]->NeighbourTriangle(triangles[i]->v3)->n)<smaller_than) divide = true;
-      if(divide){
-        sum+= triangles[i]->SetSubdivisionParameter();
-      }
-    }
     /*
      * //bad hack solution, but otherwise there could be some errors
      * //in the normals so just do it:

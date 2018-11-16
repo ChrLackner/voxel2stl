@@ -117,8 +117,23 @@ void ExportVoxel2STL(py::module & m)
            return VoxelSTLGeometry(data,materials,boundaries,log);
          }), py::arg("voxeldata"), py::arg("materials")=nullptr, py::arg("boundaries")=nullptr,
          py::arg("logger") = CreateLogger("VoxelSTLGeometry"), py::call_guard<py::gil_scoped_release>())
-    .def("SubdivideTriangles", &VoxelSTLGeometry::SubdivideTriangles)
+    .def("SubdivideTriangles", [](VoxelSTLGeometry& self, Smoother& smoother)
+         {
+           smoother.MarkTriangles();
+           self.SubdivideTriangles();
+         }, py::call_guard<py::gil_scoped_release>())
     .def("WriteSTL", &VoxelSTLGeometry::WriteSTL)
+    .def("GetMarkedTriangles", [](VoxelSTLGeometry& self, Smoother& smoother)
+         {
+           smoother.MarkTriangles();
+           py::list subdiv(self.GetNTriangles());
+           for(auto i : Range(self.GetNTriangles()))
+             {
+               subdiv[i] = self.GetTriangle(i).subdivisionParameter;
+               self.GetTriangle(i).subdivisionParameter = 0;
+             }
+           return subdiv;
+         })
     .def("GetData", [](VoxelSTLGeometry& self)
          {
            Array<float> verts;
@@ -198,7 +213,7 @@ void ExportVoxel2STL(py::module & m)
     .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
           py::arg("geo"), py::arg("logger") = CreateLogger("AngleDeficitSmoother"))
     ;
-  py::class_<NewtonSmoother<PatchEnergy<TaubinIntegralFormulation>>, shared_ptr<NewtonSmoother<PatchEnergy<TaubinIntegralFormulation>>>,
+  py::class_<NewtonSmoother<TaubinIntegralFormulation>, shared_ptr<NewtonSmoother<TaubinIntegralFormulation>>,
              Smoother>
     (m,"TaubinSmoother")
     .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
@@ -210,8 +225,8 @@ void ExportVoxel2STL(py::module & m)
     .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
           py::arg("geo"), py::arg("logger") = CreateLogger("CurvatureSmoother"))
     ;
-  py::class_<NewtonSmoother<WeightedEnergy<FirstEnergy,TaubinIntegralFormulation,70>>,
-             shared_ptr<NewtonSmoother<WeightedEnergy<FirstEnergy,TaubinIntegralFormulation,70>>>,
+  py::class_<NewtonSmoother<WeightedEnergy<FirstEnergy,TaubinIntegralFormulation,30>>,
+             shared_ptr<NewtonSmoother<WeightedEnergy<FirstEnergy,TaubinIntegralFormulation,30>>>,
              Smoother>
     (m,"FirstAndTaubinSmoother")
     .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),

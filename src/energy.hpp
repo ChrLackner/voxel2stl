@@ -53,7 +53,8 @@ namespace voxel2stl
         area += trig->area;
       E *= sqrt(area);
 
-      return E;
+      // scaling for energy
+      return E/100;
     }
   };
 
@@ -127,14 +128,12 @@ namespace voxel2stl
           normal += trig->area * trig->n;
           patch_w[trig->OtherVertices(vertex,0)] += trig->area;
           patch_w[trig->OtherVertices(vertex,1)] += trig->area;
-          // patch_w[trig->OtherVertices(vertex,0)] = 1;
-          // patch_w[trig->OtherVertices(vertex,1)] = 1;
         }
       normal /= L2Norm(normal);
       double normw = 0;
       for (auto it : patch_w)
-        normw += it.second*it.second;
-      double fac = 1./sqrt(normw);
+        normw += it.second;
+      double fac = 1./normw;
       for(auto it : patch_w)
         patch_w[it.first] *= fac;
       Mat<3> M;
@@ -147,26 +146,28 @@ namespace voxel2stl
           double kij = 2 * InnerProduct(normal,vi_minus_vj)/L2Norm(vi_minus_vj);
           M += it.second * kij * VecTransVecMatrix<3>(Tij);
         }
-      double area = 0;
-      for (auto trig : vertex->neighbours)
-        area += trig->area;
-      //double energy = 0;
-      auto w = linalg::dsyevc3(M);
-      //cout << "evals = " << w[0] << ", " << w[1] << ", " << w[2] << endl;
-      return L2Norm(w); // /sqrt(area); //(fabs(w[0]) + fabs(w[1]) + fabs(w[2]))/area;
 
-      // energy += (M(1,1)*M(2,2)-M(2,1)*M(1,2))*(M(1,1)*M(2,2)-M(2,1)*M(1,2));
-      // energy += (-M(1,0)*M(2,2)+M(2,0)*M(1,2))*(-M(1,0)*M(2,2)+M(2,0)*M(1,2));
-      // energy += (M(1,0)*M(2,1)-M(2,0)*M(1,1))*(M(1,0)*M(2,1)-M(2,0)*M(1,1));
-
-      // energy += (-M(0,1)*M(2,2)+M(2,1)*M(0,2))*(-M(0,1)*M(2,2)+M(2,1)*M(0,2));
-      // energy += (M(0,0)*M(2,2)-M(2,0)*M(0,2))*(M(0,0)*M(2,2)-M(2,0)*M(0,2));
-      // energy += (-M(0,0)*M(2,1)+M(2,0)*M(0,1))*(-M(0,0)*M(2,1)+M(2,0)*M(0,1));
-
-      // energy += (M(0,1)*M(1,2)-M(1,1)*M(0,2))*(M(0,1)*M(1,2)-M(1,1)*M(0,2));
-      // energy += (-M(0,0)*M(1,2)+M(1,0)*M(0,2))*(-M(0,0)*M(1,2)+M(1,0)*M(0,2));
-      // energy += (M(0,0)*M(1,1)-M(1,0)*M(0,1))*(M(0,0)*M(1,1)-M(1,0)*M(0,1));
-      // return sqrt(energy)/area;
+      Vec<3> e1 = { 1.,0.,0.};
+      Vec<3> w;
+      if(L2Norm(e1-normal) > L2Norm(e1+normal))
+        w = 1./L2Norm(e1-normal) * (e1-normal);
+      else
+        w = 1./L2Norm(e1+normal) * (e1 + normal);
+      Mat<3> Q = Id<3>() - 2 * VecTransVecMatrix<3>(w);
+      // first row and column of Q is orthogonal to normal -> first row and column of T is 0
+      Mat<3> T = Trans(Q) * M * Q;
+      double trace = T(1,1) + T(2,2);
+      double det = T(1,1)*T(2,2) - T(1,2)*T(2,1);
+      // eigs are trace/2 +- sqrt(trace**2/4-det)
+      double eig1 = trace/2+sqrt(trace*trace/4-det);
+      double eig2 = trace/2 - sqrt(trace*trace/4-det);
+      // principal curvature is:
+      double kp1 = 3 * eig1 - eig2;
+      double kp2 = 3 * eig2 - eig1;
+      double min_area = 1e99;
+      for(auto trig : vertex->neighbours)
+        min_area = min2(min_area, trig->area);
+      return sqrt(kp1*kp1 + kp2*kp2);
     }
   };
 
@@ -176,7 +177,7 @@ namespace voxel2stl
   public:
     inline static double Energy(VoxelSTLGeometry::Vertex* vertex)
     {
-      double fac = double(W)/100.;
+      double fac = double(W)/1000.;
       return fac *E1::Energy(vertex) + (1.-fac)*E2::Energy(vertex);
     }
   };
