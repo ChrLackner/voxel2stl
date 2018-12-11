@@ -29,6 +29,8 @@ namespace voxel2stl
     void WriteSTL(string filename);
     void SubdivideTriangles();
 
+    void CutOffAt(int component, bool positive, double val);
+
     Vertex* GetClosestVertex(Vec<3> p)
     {
       Vertex* vertex = GetVertex(0);

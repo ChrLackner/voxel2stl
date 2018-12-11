@@ -122,7 +122,7 @@ void ExportVoxel2STL(py::module & m)
            smoother.MarkTriangles();
            self.SubdivideTriangles();
          }, py::call_guard<py::gil_scoped_release>())
-    .def("WriteSTL", &VoxelSTLGeometry::WriteSTL)
+    .def("WriteSTL", &VoxelSTLGeometry::WriteSTL, py::call_guard<py::gil_scoped_release>())
     .def("GetMarkedTriangles", [](VoxelSTLGeometry& self, Smoother& smoother)
          {
            smoother.MarkTriangles();
@@ -134,6 +134,7 @@ void ExportVoxel2STL(py::module & m)
              }
            return subdiv;
          })
+    .def("CutOffAt", &VoxelSTLGeometry::CutOffAt, py::call_guard<py::gil_scoped_release>())
     .def("GetData", [](VoxelSTLGeometry& self)
          {
            Array<float> verts;

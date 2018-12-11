@@ -81,6 +81,93 @@ namespace voxel2stl
       stlout << "endfacet" << "\n";
     }
     stlout << "endsolid" << endl;
+    log->info("Done");
+  }
+
+  void VoxelSTLGeometry :: CutOffAt(int component, bool positive, double val)
+  {
+    double eps = 1e-7;
+    auto isOutside = [component, positive, val, eps] (Vertex* v)
+                     { return positive ? v->xy[component] > val-eps : v->xy[component] < val+eps; };
+    std::set<size_t> to_remove_trig;
+    std::set<Vertex*> to_remove_vert;
+    std::set<Vertex*> moved_verts;
+    Array<std::pair<Vertex*,Vertex*>> verts_for_new_trigs;
+    for(auto i : Range(triangles.Size()))
+      {
+        auto& trig = triangles[i];
+        bool out[3] = { isOutside(trig->v1), isOutside(trig->v2), isOutside(trig->v3) };
+        int nout = std::count(std::begin(out), std::end(out), true);
+        if(nout == 3)
+          {
+            to_remove_trig.insert(i);
+            for(auto v : {trig->v1, trig->v2, trig->v3})
+              to_remove_vert.insert(v);
+          }
+        if(nout == 2 || nout == 1)
+          {
+            if(out[0])
+              {
+                trig->v1->xy[component] = positive ? val + eps : val - eps;
+                moved_verts.insert(trig->v1);
+              }
+            if(out[1])
+              {
+                trig->v2->xy[component] = positive ? val + eps : val - eps;
+                moved_verts.insert(trig->v2);
+              }
+            if(out[2])
+              {
+                trig->v3->xy[component] = positive ? val + eps : val - eps;
+                moved_verts.insert(trig->v3);
+              }
+          }
+        if (nout == 2)
+          {
+            if(!out[0])
+              verts_for_new_trigs.Append(std::make_pair(trig->v3,trig->v2));
+            if(!out[1])
+              verts_for_new_trigs.Append(std::make_pair(trig->v1,trig->v3));
+            if(!out[2])
+              verts_for_new_trigs.Append(std::make_pair(trig->v2,trig->v1));
+          }
+      }
+    for(auto v : moved_verts)
+        v->xy[component] -= positive ? eps : -eps;
+    for(auto it = to_remove_trig.rbegin(); it != to_remove_trig.rend(); ++it)
+        triangles.DeleteElement(*it);
+    while(verts_for_new_trigs.Size())
+      {
+        auto mid_vertex = make_unique<Vertex>();
+        mid_vertex->xy = 0.;
+        // collect vertices belonging to one cut face
+        Array<std::pair<Vertex*,Vertex*>> pairs;
+        pairs.Append(std::move(verts_for_new_trigs.Last()));
+        verts_for_new_trigs.DeleteLast();
+        while(true)
+          {
+            size_t index; bool found = false;
+            for(size_t i = 0; i < verts_for_new_trigs.Size(); i++)
+              if(verts_for_new_trigs[i].first == pairs.Last().second)
+                {
+                  found = true;
+                  index = i;
+                }
+            if(!found)
+              break;
+            pairs.Append(std::move(verts_for_new_trigs[index]));
+            verts_for_new_trigs.DeleteElement(index);
+          }
+        if(pairs[0].first != pairs.Last().second)
+          throw Exception("Cutting plane not closed!");
+        for(auto& pair : pairs)
+            mid_vertex->xy += pair.first->xy;
+        mid_vertex->xy *= 1./pairs.Size();
+        auto mid_vertex_ptr = &* mid_vertex;
+        vertices.Append(std::move(mid_vertex));
+        for(auto pair : pairs)
+          triangles.Append(make_unique<Triangle>(pair.first, pair.second, mid_vertex_ptr));
+      }
   }
 
   void VoxelSTLGeometry :: GenerateTrianglesAndVertices()
