@@ -1,5 +1,4 @@
 
-//#define SPDLOG_DEBUG_ON
 #include "voxel2stl.hpp"
 #include <omp.h>
 #include <set>
@@ -11,7 +10,7 @@ namespace std
   string to_string(ngbla::Vec<N> vec)
   {
     string str = "(" + to_string(vec[0]);
-    for(auto i : Range(1,N))
+    for(auto i : ngcore::Range(1,N))
       str += ", " + to_string(vec[i]);
     str += ")";
     return str;
@@ -22,10 +21,8 @@ namespace voxel2stl
 {
   VoxelSTLGeometry::VoxelSTLGeometry(shared_ptr<VoxelData> adata,
                                      const Array<size_t>& amaterials,
-                                     const Array<size_t>& aboundaries,
-                                     shared_ptr<spdlog::logger> log)
-    : pyspdlog::LoggedClass(log),
-      data(adata), materials(amaterials), boundaries(aboundaries)
+                                     const Array<size_t>& aboundaries)
+    : data(adata), materials(amaterials), boundaries(aboundaries)
   {
     if(!adata)
       return;
@@ -40,7 +37,7 @@ namespace voxel2stl
 
   void VoxelSTLGeometry :: WriteSTL(string filename)
   {
-    log->info("Start writing to stl file");
+    // log->info("Start writing to stl file");
     ofstream stlout;
     stlout.open(filename);
     stlout.precision(12);
@@ -56,7 +53,7 @@ namespace voxel2stl
       n = triangles[i]->n;
       if (L2Norm(n) < 1e-10 || L2Norm(p1 - p2) < 1e-10 || L2Norm(p3 - p2) < 1e-10)
         {
-          log->error("Error in triangle!");
+          // log->error("Error in triangle!");
           return;
 	}
       Vec<3,double> normal;
@@ -81,7 +78,7 @@ namespace voxel2stl
       stlout << "endfacet" << "\n";
     }
     stlout << "endsolid" << endl;
-    log->info("Done");
+    // log->info("Done");
   }
 
   void VoxelSTLGeometry :: CutOffAt(int component, bool positive, double val)
@@ -172,19 +169,20 @@ namespace voxel2stl
 
   void VoxelSTLGeometry :: GenerateTrianglesAndVertices()
   {
-    log->info("Create triangles and vertices with " + std::to_string(num_threads)  + " threads...");
+    // log->info("Create triangles and vertices with " + std::to_string(num_threads)  + " threads...");
     Array<unique_ptr<Vertex>> thread_vertices[num_threads];
-    log->debug("Data size is " + to_string(data->Getnx()) + " x " + to_string(data->Getny()) + " x " +
-               to_string(data->Getnz()));
-    log->debug("Boundaries are:\nx: " + to_string(boundaries[0]) + " to " + to_string(boundaries[1]) + "\ny: " +
-               to_string(boundaries[2]) + " to " + to_string(boundaries[3]) + "\nz: " + to_string(boundaries[4]) +
-               " to " + to_string(boundaries[5]));
-    log->debug("Materials are:");
-    for(auto val : materials)
-      log->debug(to_string(val));
+   // log->debug("Data size is " + to_string(data->Getnx()) + " x " + to_string(data->Getny()) + " x " +
+   //             to_string(data->Getnz()));
+   // log->debug("Boundaries are:\nx: " + to_string(boundaries[0]) + " to " + to_string(boundaries[1]) + "\ny: " +
+   //             to_string(boundaries[2]) + " to " + to_string(boundaries[3]) + "\nz: " + to_string(boundaries[4]) +
+   //             " to " + to_string(boundaries[5]));
+   //  log->debug("Materials are:");
+    // for(auto val : materials)
+    //   log->debug(to_string(val));
 
     size_t sum_size = 0;
-    int count = 0;
+    // int count = 0;
+
     for(auto ixiy : {true,false})
       {
         for(auto ixiz : {true,false})
@@ -206,19 +204,19 @@ namespace voxel2stl
                   vertices.Append(move(thread_vertices[i][j]));
                 thread_vertices[i].SetSize(0);
               }
-            log->debug("Num vertices created after " + std::to_string(++count) +
-                       " round = " + std::to_string(sum_size));
+            // log->debug("Num vertices created after " + std::to_string(++count) +
+            //            " round = " + std::to_string(sum_size));
           }
       }
-    for(auto i : Range(vertices.Size()))
-      if(vertices[i]->nn <3)
-        log->warn("Vertex has less than 3 triangles: " + to_string(vertices[i]->xy));
-    log->info("Triangles generated.");
+    // for(auto i : Range(vertices.Size()))
+    //   if(vertices[i]->nn <3)
+    //     log->warn("Vertex has less than 3 triangles: " + to_string(vertices[i]->xy));
+    // log->info("Triangles generated.");
   }
 
   void VoxelSTLGeometry :: PartitionVertices()
   {
-    log->info("Start partitioning of vertices...");
+    // log->info("Start partitioning of vertices...");
     Array<size_t> cluster_count;
     for (auto& vert : vertices)
       {
@@ -236,18 +234,18 @@ namespace voxel2stl
     for (auto& vert : vertices)
       vertex_clustering[vert->cluster]->Append(&*vert);
 
-    log->debug("Using " + std::to_string(vertex_clustering.Size()) + " clusters for the vertices");
-    log->debug("In total there are " + std::to_string(vertices.Size()) + " vertices");
-    log->debug(" and " + std::to_string(triangles.Size()) + " triangles.");
-    for (auto i : Range(vertex_clustering.Size()))
-      log->debug("Cluster " + std::to_string(i+1) + " has " + std::to_string(vertex_clustering[i]->Size()) + " vertices.");
-    log->flush();
-    log->info("Partitioning done.");
+    // log->debug("Using " + std::to_string(vertex_clustering.Size()) + " clusters for the vertices");
+    // log->debug("In total there are " + std::to_string(vertices.Size()) + " vertices");
+    // log->debug(" and " + std::to_string(triangles.Size()) + " triangles.");
+    // for (auto i : Range(vertex_clustering.Size()))
+    //   log->debug("Cluster " + std::to_string(i+1) + " has " + std::to_string(vertex_clustering[i]->Size()) + " vertices.");
+    // log->flush();
+    // log->info("Partitioning done.");
   }
 
   void VoxelSTLGeometry :: SubdivideTriangles()
   {
-    log->info("Start subdividing triangles");
+    // log->info("Start subdividing triangles");
     /*
      * //bad hack solution, but otherwise there could be some errors
      * //in the normals so just do it:
@@ -353,13 +351,13 @@ namespace voxel2stl
         vertex_clustering[vert->cluster]->Append(&*vert);
         vertices.Append(move(vert));
       }
-    log->info("done.");
+    // log->info("done.");
   }
 
   void VoxelSTLGeometry :: GenerateTVCube(size_t x, size_t y, size_t z,
                                           Array<unique_ptr<Vertex>>& thread_vertices)
   {
-    SPDLOG_DEBUG(log, "Start cube (" + to_string(x) + "," + to_string(y) + "," + to_string(z) + ")");
+    // SPDLOG_DEBUG(log, "Start cube (" + to_string(x) + "," + to_string(y) + "," + to_string(z) + ")");
     int one = 1;
     //flip cube diagonal every second step to match faces of tetraeders inside
     size_t x_old = x; size_t y_old = y; size_t z_old = z;
@@ -371,12 +369,12 @@ namespace voxel2stl
     bool isused[8] = {isUsedVoxel(x,y,z),isUsedVoxel(x,y,z+one),isUsedVoxel(x,y+one,z),
                       isUsedVoxel(x,y+one,z+one),isUsedVoxel(x+one,y,z),isUsedVoxel(x+one,y,z+one),
                       isUsedVoxel(x+one,y+one,z),isUsedVoxel(x+one,y+one,z+one)};
-    SPDLOG_DEBUG(log, "Is used = ");
-    for(auto i : Range(8))
-      SPDLOG_DEBUG(log,to_string(isused[i]));
+    // SPDLOG_DEBUG(log, "Is used = ");
+    // for(auto i : Range(8))
+    //   SPDLOG_DEBUG(log,to_string(isused[i]));
     if (std::all_of(std::begin(isused),std::end(isused),[](bool b) { return !b; }))
       return;
-    SPDLOG_DEBUG(log, "Not all are unused");
+    // SPDLOG_DEBUG(log, "Not all are unused");
     unsigned char combinations[5][6][2] = {{{0,4},{0,2},{0,1},{4,2},{4,1},{2,1}},
                                            {{4,6},{6,7},{4,7},{2,6},{4,2},{2,7}},
                                            {{4,1},{4,5},{1,5},{4,7},{1,7},{5,7}},
@@ -399,11 +397,11 @@ namespace voxel2stl
                 count++;
               }
           }
-        SPDLOG_DEBUG(log, "Found " + to_string(count) + " cuttings in voxel " + to_string(x) + ", " +
-                     to_string(y) + ", " + to_string(z));
+        // SPDLOG_DEBUG(log, "Found " + to_string(count) + " cuttings in voxel " + to_string(x) + ", " +
+        //              to_string(y) + ", " + to_string(z));
         if(count >= 3) {
           auto triangle1 = make_unique<Triangle>(tet[0],tet[1],tet[2]);
-          SPDLOG_DEBUG(log,"Created new triangle1: " + triangle1->to_string());
+          // SPDLOG_DEBUG(log,"Created new triangle1: " + triangle1->to_string());
           for (int i=0; i<3; i++){
             tet[i]->addNeighbour(&*triangle1);
           }
@@ -412,7 +410,7 @@ namespace voxel2stl
         }
         if(count==4){
           auto triangle2 = make_unique<Triangle>(tet[1],tet[2],tet[3]);
-          SPDLOG_DEBUG(log,"Created new triangle2: " + triangle2->to_string());
+          // SPDLOG_DEBUG(log,"Created new triangle2: " + triangle2->to_string());
           for (int i=1; i<4; i++){
             tet[i]->addNeighbour(&*triangle2);
           }
@@ -454,7 +452,7 @@ namespace voxel2stl
     if(itV != voxel_to_vertex.end())
       {
         auto vert = itV->second;
-        SPDLOG_DEBUG(log, "Vertex " + vert->to_string() + " found in global vertices");
+        // SPDLOG_DEBUG(log, "Vertex " + vert->to_string() + " found in global vertices");
         return vert;
       }
 
@@ -464,7 +462,7 @@ namespace voxel2stl
 #pragma omp critical(voxel_to_vertex)
     voxel_to_vertex[make_tuple(x1,y1,z1,x2,y2,z2)] = nvert;
 
-    SPDLOG_DEBUG(log, "Created new vertex " + nvert->to_string());
+    // SPDLOG_DEBUG(log, "Created new vertex " + nvert->to_string());
     thread_vertices.Append(move(newVertex));
     return nvert;
   }

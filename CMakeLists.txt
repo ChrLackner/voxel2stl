@@ -21,13 +21,8 @@ if(USE_CCACHE)
 endif(USE_CCACHE)
 
 # OpenMP
-find_package(OpenMP)
+find_package(OpenMP REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-
-# pyspdlog
-find_package(Pyspdlog REQUIRED)
-include_directories(${PYSPDLOG_INCLUDE_DIRS})
-include_directories(${PYBIND11_INCLUDE_DIR})
 
 add_subdirectory(src)
 add_subdirectory(python)

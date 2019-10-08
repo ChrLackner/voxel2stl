@@ -10,27 +10,26 @@
 
 using namespace voxel2stl;
 
-shared_ptr<spdlog::sinks::sink> global_sink = make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
+// shared_ptr<spdlog::sinks::sink> global_sink = make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
 
-shared_ptr<spdlog::logger> CreateLogger(string name)
-{
-  auto logger = make_shared<spdlog::logger>(name, global_sink);
-  logger->set_level(spdlog::level::debug);
-  return logger;
-}
+// shared_ptr<spdlog::logger> CreateLogger(string name)
+// {
+//   auto logger = make_shared<spdlog::logger>(name, global_sink);
+//   logger->set_level(spdlog::level::debug);
+//   return logger;
+// }
 
-void ExportVoxel2STL(py::module & m)
+PYBIND11_MODULE(libvoxel2stl,m)
 {
-  global_sink->set_level(spdlog::level::info);
-  m.def("SetGlobalSinkLevel", [](spdlog::level::level_enum en)
-        {
-          global_sink->set_level(en);
-        });
+  // global_sink->set_level(spdlog::level::info);
+  // m.def("SetGlobalSinkLevel", [](spdlog::level::level_enum en)
+  //       {
+  //         global_sink->set_level(en);
+  //       });
   py::class_<VoxelData,shared_ptr<VoxelData>>
     (m,"VoxelData", "Container for loading of voxel data")
-    .def(py::init<string, size_t, size_t, size_t, double, shared_ptr<spdlog::logger>>(),
-         py::arg("filename"), py::arg("nx"), py::arg("ny"), py::arg("nz"), py::arg("m"),
-         py::arg("log") = CreateLogger("Voxeldata"))
+    .def(py::init<string, size_t, size_t, size_t, double>(),
+         py::arg("filename"), py::arg("nx"), py::arg("ny"), py::arg("nz"), py::arg("m"))
     .def(py::pickle([](VoxelData& self)
                     {
                       MemoryView mv(&self.GetData()[0], self.GetData().Size());
@@ -42,8 +41,7 @@ void ExportVoxel2STL(py::module & m)
                       auto mv = py::cast<MemoryView>(state[4]);
                       Array<unsigned char> data(mv.Size(),(unsigned char*) mv.Ptr(),true);
                       VoxelData voxel(data, state[0].cast<size_t>(), state[1].cast<size_t>(),
-                                      state[2].cast<size_t>(), state[3].cast<double>(),
-                                      make_shared<spdlog::logger>("VoxelData", make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>()));
+                                      state[2].cast<size_t>(), state[3].cast<double>());
                       auto mats = state[5].cast<map<unsigned char, string>>();
                       for (auto val : mats)
                         voxel.SetMaterialName(val.first, val.second);
@@ -86,9 +84,9 @@ void ExportVoxel2STL(py::module & m)
          {
            for(auto i : Range(py::len(matnames)))
              if(self.GetMaterialNames().count(i+1) == 0)
-               self.GetLogger()->warn("Material " + py::cast<string>(matnames[i]) + " not used!");
-           else
-             self.SetMaterialName((unsigned char) (i+1),py::cast<string>(matnames[i]));
+               ; //self.GetLogger()->warn("Material " + py::cast<string>(matnames[i]) + " not used!");
+             else
+               self.SetMaterialName((unsigned char) (i+1),py::cast<string>(matnames[i]));
          })
     .def_property_readonly("data", [](VoxelData& self)
                            {
@@ -98,10 +96,10 @@ void ExportVoxel2STL(py::module & m)
                            }, py::return_value_policy::reference_internal)
     ;
 
-  py::class_<VoxelSTLGeometry, shared_ptr<VoxelSTLGeometry>, pyspdlog::LoggedClass>
+  py::class_<VoxelSTLGeometry, shared_ptr<VoxelSTLGeometry>>
     (m,"VoxelSTLGeometry", "STLGeometry from voxel data", py::dynamic_attr())
     .def(py::init([](shared_ptr<VoxelData> data,
-                     py::object mats, py::object bnds, shared_ptr<spdlog::logger> log)
+                     py::object mats, py::object bnds)
          {
            Array<size_t> materials;
            Array<size_t> boundaries;
@@ -112,11 +110,12 @@ void ExportVoxel2STL(py::module & m)
                  materials.Append(py::cast<size_t>(mat));
              if (!bnds.is_none())
                for (auto bnd : py::cast<py::list>(bnds))
-               boundaries.Append(py::cast<size_t>(bnd));
+                 boundaries.Append(py::cast<size_t>(bnd));
+             else
+               boundaries.Append({0, size_t(-3), 0, size_t(-3), 0, size_t(-3)});
            }
-           return VoxelSTLGeometry(data,materials,boundaries,log);
-         }), py::arg("voxeldata"), py::arg("materials")=nullptr, py::arg("boundaries")=nullptr,
-         py::arg("logger") = CreateLogger("VoxelSTLGeometry"), py::call_guard<py::gil_scoped_release>())
+           return VoxelSTLGeometry(data,materials,boundaries);
+         }), py::arg("voxeldata"), py::arg("materials")=nullptr, py::arg("boundaries")=nullptr, py::call_guard<py::gil_scoped_release>())
     .def("SubdivideTriangles", [](VoxelSTLGeometry& self, Smoother& smoother)
          {
            smoother.MarkTriangles();
@@ -182,7 +181,7 @@ void ExportVoxel2STL(py::module & m)
          })
     ;
 
-  py::class_<Smoother, shared_ptr<Smoother>, pyspdlog::LoggedClass>
+  py::class_<Smoother, shared_ptr<Smoother>>
     (m,"Smoother", "Base class for smoothers")
     .def("Apply", &Smoother::Apply,py::call_guard<py::gil_scoped_release>())
     .def("CalcEnergy", [](Smoother& self)
@@ -199,39 +198,41 @@ void ExportVoxel2STL(py::module & m)
          })
         ;
 
-  py::class_<NewtonSmoother<FirstEnergy>, shared_ptr<NewtonSmoother<FirstEnergy>>, Smoother>
+  py::class_<NewtonSmoother<FirstEnergy>,
+             shared_ptr<NewtonSmoother<FirstEnergy>>, Smoother>
     (m,"FirstSmoother", "First simple smoothing alg.")
-    .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
-          py::arg("geo"), py::arg("logger") = CreateLogger("FirstSmoother"))
+    .def (py::init<shared_ptr<VoxelSTLGeometry>>(), py::arg("geo"))
     ;
-  py::class_<NewtonSmoother<SimpleEnergy>, shared_ptr<NewtonSmoother<SimpleEnergy>>, Smoother>
+  py::class_<NewtonSmoother<SimpleEnergy>,
+             shared_ptr<NewtonSmoother<SimpleEnergy>>, Smoother>
     (m,"SimpleSmoother", "First simple smoothing alg.")
-    .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
-          py::arg("geo"), py::arg("logger") = CreateLogger("SimpleSmoother"))
+    .def (py::init<shared_ptr<VoxelSTLGeometry>>(), py::arg("geo"))
     ;
-  py::class_<NewtonSmoother<PatchEnergy<AngleDeficit>>, shared_ptr<NewtonSmoother<PatchEnergy<AngleDeficit>>>, Smoother>
+  py::class_<NewtonSmoother<PatchEnergy<AngleDeficit>>,
+             shared_ptr<NewtonSmoother<PatchEnergy<AngleDeficit>>>,
+             Smoother>
     (m,"AngleDeficitSmoother", "from http://www.cc.ac.cn/06research_report/0601.pdf")
-    .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
-          py::arg("geo"), py::arg("logger") = CreateLogger("AngleDeficitSmoother"))
+    .def (py::init<shared_ptr<VoxelSTLGeometry>>(), py::arg("geo"))
     ;
-  py::class_<NewtonSmoother<TaubinIntegralFormulation>, shared_ptr<NewtonSmoother<TaubinIntegralFormulation>>,
+  py::class_<NewtonSmoother<TaubinIntegralFormulation>,
+             shared_ptr<NewtonSmoother<TaubinIntegralFormulation>>,
              Smoother>
     (m,"TaubinSmoother")
-    .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
-          py::arg("geo"), py::arg("logger") = CreateLogger("TaubinSmoother"))
+    .def (py::init<shared_ptr<VoxelSTLGeometry>>(),
+          py::arg("geo"))
     ;
   py::class_<NewtonSmoother<PatchEnergy<CurvatureEstimation>>, shared_ptr<NewtonSmoother<PatchEnergy<CurvatureEstimation>>>,
              Smoother>
     (m,"CurvatureSmoother")
-    .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
-          py::arg("geo"), py::arg("logger") = CreateLogger("CurvatureSmoother"))
+    .def (py::init<shared_ptr<VoxelSTLGeometry>>(),
+          py::arg("geo"))
     ;
   py::class_<NewtonSmoother<WeightedEnergy<FirstEnergy,TaubinIntegralFormulation,30>>,
              shared_ptr<NewtonSmoother<WeightedEnergy<FirstEnergy,TaubinIntegralFormulation,30>>>,
              Smoother>
     (m,"FirstAndTaubinSmoother")
-    .def (py::init<shared_ptr<VoxelSTLGeometry>,shared_ptr<spdlog::logger>>(),
-          py::arg("geo"), py::arg("logger") = CreateLogger("FirstAndTaubinSmoother"))
+    .def (py::init<shared_ptr<VoxelSTLGeometry>>(),
+          py::arg("geo"))
     ;
   m.def("GetClosestVertex", [](VoxelSTLGeometry& geo, py::tuple pnt)
         {
@@ -316,25 +317,16 @@ void ExportVoxel2STL(py::module & m)
 
   py::class_<TestGeometry, shared_ptr<TestGeometry>, VoxelSTLGeometry>
     (m,"TestGeometry")
-    .def(py::init([](py::array_t<double> verts, py::array_t<size_t> trigs,
-                     shared_ptr<spdlog::logger> log)
+    .def(py::init([](py::array_t<double> verts, py::array_t<size_t> trigs)
                   {
                     Array<double> averts(verts.size(), (double*) verts.data());
                     Array<size_t> atrigs(trigs.size(), (size_t*) trigs.data());
-                    return TestGeometry(averts,atrigs,log);
-                  }), py::arg("vertices"), py::arg("triangles"),
-         py::arg("logger")=CreateLogger("TestGeometry"))
+                    return TestGeometry(averts,atrigs);
+                  }), py::arg("vertices"), py::arg("triangles"))
     .def("GetBoundingBox ",[](TestGeometry& self)
                           {
                             return py::make_tuple(0,1,0,1,0,1);
                           })
     ;
 #endif //TEST_GEOMETRY
-}
-
-
-PYBIND11_MODULE(libvoxel2stl,m)
-{
-  py::module::import("pyspdlog");
-  ExportVoxel2STL(m);
 }

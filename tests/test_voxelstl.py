@@ -1,6 +1,5 @@
 
 from voxel2stl import *
-from pyspdlog import *
 from struct import pack
 from numpy import pi
 import stl
@@ -18,20 +17,13 @@ def CreateVoxel(filename,indicator_function,dimensions):
 
 
 def test_voxelSTL():
-    sinkfile = simple_file_sink("debug.out",True)
-    sinkconsole = console_sink(True)
-    logger = Logger("Geometry",[sinkfile,sinkconsole])
-    logger.SetLevel(LOGGING_LEVEL.DEBUG)
-    sinkconsole.SetLevel(LOGGING_LEVEL.INFO)
-    sinkfile.SetLevel(LOGGING_LEVEL.DEBUG)
     CreateVoxel("voxelmodel.raw",
                 lambda x,y,z: int((100-((x-50)*(x-50)+(y-50)*(y-50)+(z-50)*(z-50)))>0) +
                 int((100-((x-50)*(x-50)+(y-50)*(y-50)+(z-50)*(z-50)))>0) * int(z>=50),
                 (100,100,100))
     data = VoxelData("voxelmodel.raw",100,100,100,0.01)
-    geo = VoxelSTLGeometry(data,materials=[2],boundaries=[0,200,50,200,0,200],logger=logger)
-    logger.info("STL done, start smoothing")
-    smoother = FirstSmoother(geo,logger=logger)
+    geo = VoxelSTLGeometry(data,materials=[2],boundaries=[0,200,50,200,0,200])
+    smoother = FirstSmoother(geo)
     smoother.Apply()
     smoother.Apply()
     for i in range(8):
@@ -39,7 +31,6 @@ def test_voxelSTL():
         smoother.Apply()
     smoother.Apply()
     smoother.Apply()
-    logger.info("Smoothing done, start writing to stl file")
     geo.WriteSTL("model.stl")
     stl_mesh = stl.mesh.Mesh.from_file("model.stl")
     if __name__ == "__main__":

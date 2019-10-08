@@ -8,12 +8,10 @@ namespace voxel2stl
   private:
     Array<unique_ptr<Vertex>> boundary_vertices;
   public:
-    TestGeometry(Array<double>& avertices, Array<size_t>& atrigs,
-                 shared_ptr<spdlog::logger> log)
+    TestGeometry(Array<double>& avertices, Array<size_t>& atrigs)
       : VoxelSTLGeometry(nullptr,
                          Array<size_t>(),
-                         Array<size_t>(),
-                         log)
+                         Array<size_t>())
     {
       m = 1;
       Array<unique_ptr<Vertex>> all_vertices;

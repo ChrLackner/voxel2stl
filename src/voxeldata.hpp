@@ -3,7 +3,7 @@
 
 namespace voxel2stl
 {  
-  class VoxelData : public pyspdlog::LoggedClass
+  class VoxelData
   {
   private:
     Array<unsigned char> data;
@@ -12,12 +12,10 @@ namespace voxel2stl
     double m;
   
   public:
-    VoxelData(std::string filename, size_t anx, size_t any, size_t anz, double am,
-              shared_ptr<spdlog::logger> alog);
+    VoxelData(std::string filename, size_t anx, size_t any, size_t anz, double am);
 
-    VoxelData(Array<unsigned char>& adata, size_t anx, size_t any, size_t anz, double am,
-              shared_ptr<spdlog::logger> alog)
-      : nx(anx), ny(any), nz(anz), m(am), LoggedClass(alog)
+    VoxelData(Array<unsigned char>& adata, size_t anx, size_t any, size_t anz, double am)
+      : nx(anx), ny(any), nz(anz), m(am)
     {
       data.Swap(adata);
       for(auto i : Range(nx*ny*nz))

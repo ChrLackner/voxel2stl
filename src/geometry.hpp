@@ -5,7 +5,7 @@ namespace voxel2stl
 {
   class Smoother;
 
-  class VoxelSTLGeometry : public pyspdlog::LoggedClass
+  class VoxelSTLGeometry
   {
   public:
     struct Vertex;
@@ -24,7 +24,7 @@ namespace voxel2stl
 
   public:
     VoxelSTLGeometry(shared_ptr<VoxelData> adata, const Array<size_t>& amaterials,
-                     const Array<size_t>& aboundaries, shared_ptr<spdlog::logger> log);
+                     const Array<size_t>& aboundaries);
 
     void WriteSTL(string filename);
     void SubdivideTriangles();
@@ -57,16 +57,16 @@ namespace voxel2stl
   private:
     inline bool isUsedVoxel(size_t x, size_t y, size_t z)
     {
-      SPDLOG_DEBUG(log, "Check voxel (" + to_string(x) + "," + to_string(y) + "," + to_string(z) + ")");
+      // SPDLOG_DEBUG(log, "Check voxel (" + to_string(x) + "," + to_string(y) + "," + to_string(z) + ")");
       if (boundaries.Size())
         {
           if (x < boundaries[0] || x > boundaries[1] || y < boundaries[2] || y > boundaries[3]
               || z < boundaries[4] || z > boundaries[5]){
-            SPDLOG_DEBUG(log, "Out of boundaries");
+            // SPDLOG_DEBUG(log, "Out of boundaries");
             return false;
           }
         }
-      SPDLOG_DEBUG(log, "In boundaries, material = " + to_string((*data)(x,y,z)));
+      // SPDLOG_DEBUG(log, "In boundaries, material = " + to_string((*data)(x,y,z)));
       if (!materials.Size())
         return (*data)(x,y,z);
       if (materials.Contains((*data)(x,y,z)))

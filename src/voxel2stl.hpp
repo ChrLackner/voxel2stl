@@ -6,7 +6,6 @@
 #include <set>
 #include <fstream>
 #include <fem.hpp>
-#include "pyspdlog.hpp"
 namespace voxel2stl{
   using namespace std;
   using namespace ngstd;

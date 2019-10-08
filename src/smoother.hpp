@@ -7,13 +7,15 @@
 namespace voxel2stl
 {
 
-  class Smoother : public pyspdlog::LoggedClass
+  class Smoother
   {
   protected:
     shared_ptr<VoxelSTLGeometry> geo;
   public:
-    Smoother(shared_ptr<VoxelSTLGeometry> _geo, shared_ptr<spdlog::logger> log)
-      : geo(_geo), pyspdlog::LoggedClass(log) { ; }
+    Smoother(shared_ptr<VoxelSTLGeometry> _geo)
+      : geo(_geo) { ; }
+
+    virtual ~Smoother() {}
 
     virtual void Apply() = 0;
     virtual Array<float> CalcEnergy() const
@@ -43,8 +45,8 @@ namespace voxel2stl
   class NewtonSmoother : public Smoother
   {
   public:
-    NewtonSmoother(shared_ptr<VoxelSTLGeometry> geo, shared_ptr<spdlog::logger> log)
-      : Smoother(geo,log)
+    NewtonSmoother(shared_ptr<VoxelSTLGeometry> geo)
+      : Smoother(geo)
     {
       // geo->CreateClusters<NewtonClass>();
     }
@@ -57,7 +59,7 @@ namespace voxel2stl
         num_threads = omp_get_num_threads();
       }
       double e = 0; double e_diff = 0;
-      log->info("Minimize energy with " + std::to_string(num_threads) + " threads...");
+      // log->info("Minimize energy with " + std::to_string(num_threads) + " threads...");
       auto& vertex_clustering = geo->GetVertexClustering();
       for (size_t cluster = 0; cluster<vertex_clustering.Size(); cluster++)
         {
@@ -65,7 +67,7 @@ namespace voxel2stl
           for (size_t i = 0; i < vertex_clustering[cluster]->Size();i++)
             Newton((*vertex_clustering[cluster])[i]);
         }
-      log->info("done.");
+      // log->info("done.");
     }
     virtual Array<float> CalcEnergy() const override
     {
